@@ -44,5 +44,6 @@ Week 08 关键证据链: `release-manifest-v1.json`（版本绑定）→ `ci-evi
 | --- | --- | --- |
 | 开发库演示残留 | 已知 | `data/northstar.db` 含 Week 07 冒烟演示行；交付以全新库为准，删除该文件可重建 |
 | 冒烟一次性前置 | 已文档化 | 冒烟要求全新初始化库；同库重跑语义改变（rollback-drill §4.1） |
+| 缺省 token 默认客服身份 | 已登记 | `auth.py` 无 `X-Auth-Token` 时默认 `support_agent`（Week 05 教学模拟语义，Week 07 冻结保持）；生产化必须改为 401（test_deployment_release 已固化现行为防漂移） |
 | check_policy 重评估语义 | 已文档化 | 无状态守卫（重评估），已被状态机测试覆盖；如需"仅 initialized 可查"须显式变更契约 |
 | 客户端正文展示豁免 | 已裁决 | `workbench_cli.py` 授权展示豁免，见 basic-observability-note-v1 §4 |

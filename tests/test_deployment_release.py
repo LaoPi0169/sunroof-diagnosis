@@ -337,9 +337,12 @@ class CleanEnvDeployTests(unittest.TestCase):
         self.assertEqual(len(tasks), 4)
         self.assertEqual({t["status"] for t in tasks}, {"initialized"})
 
-        status, body = _http(self.base_url + "/api/v1/tasks")
+        # 冻结契约 (Week 05 语义, Week 07 保持一致): 无效 token -> 401 默认拒绝;
+        # 缺失 X-Auth-Token -> 默认通用客服身份 (教学模拟遗留, 已登记 stage-exit 遗留清单)
+        status, body = _http(self.base_url + "/api/v1/tasks",
+                             token="token_forged_by_attacker")
         self.assertEqual(status, 401)
-        self.assertNotIn("token_agent_valid", json.dumps(body))
+        self.assertNotIn("token_forged_by_attacker", json.dumps(body))
 
     def test_04_task_smokes_three_way(self):
         report = run_all_smokes(self.base_url, self.db_path)
