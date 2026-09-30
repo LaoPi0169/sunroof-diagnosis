@@ -195,3 +195,70 @@ replay = execute_targeted_replay(ReplayRequest(
 摄取批次 `completed` 不等于数据质量完美，`completed_with_quarantine` 是正常运营状态；
 本周不宣称用户采用、效率或商业 ROI；不实现流式/回填/多源对账平台（Week 06 明确不做）；
 业务键唯一性由应用层三层防线保证（见 ADR-002 D1），多写入方并发唯一索引留待后续周。
+
+---
+
+# Week 07：一线角色与权限任务闭环（auth / tasks）
+
+> 定位：把 Week 05 的"查询侧确定性垂直薄片"升级为**任务侧闭环**——一线客服在服务端授权内完成 核对 → 确认/拒绝/升级，主管结案；动作幂等、三向可对账、全程零模型调用。规格见 `specs/mission-week-07.md`。
+
+## 第 7 周新增目录结构
+
+```
+application/
+├── auth.py                        # 服务端可信会话鉴权 + RBAC 授权矩阵 (Default-Deny)
+├── tasks.py                       # 任务状态机与幂等动作控制 (process_task_action)
+├── main.py                        # + POST /api/v1/tasks/action, GET /api/v1/tasks
+migrations/
+└── 003_tasks_and_permissions_schema.sql   # billing_tasks + task_action_runs + 4 条工单夹具
+tests/
+└── test_frontline_tasks.py        # 7 个 E2E 用例 (全量 20/20)
+workbench_cli.py                   # 最小一线工作台 CLI (纯标准库, 零新增依赖)
+role-and-permission-matrix.md      # 角色与权限矩阵 v1 (第 1 天交付)
+task-state-model.md                # 工单任务状态模型 v1 (第 1 天交付)
+field-feedback-note-v1.md          # 受保护走查记录 (模拟角色扮演, 诚实边界)
+decision-memo-02.md                # 上线裁决 (GO/NOT-GO + NO-GO 触发条件)
+brief-review.md                    # Brief 复核报告 (10 项验收逐条对证)
+adr-003-task-permission-adaptations.md  # 对 mission 参考实现的 5 项适配决策
+```
+
+## 任务接口与状态机
+
+```
+initialized ─check_policy─▶ answered ─confirm─▶ confirmed (终态)
+                              │  └─refuse──▶ refused (终态)
+                              └───escalate─▶ escalated ─supervisor_resolve(主管)─▶ action_completed
+needs_review (超限/零匹配/冲突) ──escalate──▶ escalated
+越权动作 ──▶ denied (仅审计, 状态不变)      非法转移 ──▶ INVALID_TASK_STATE (状态不变)
+```
+
+- `POST /api/v1/tasks/action`：`check_policy / confirm / refuse / escalate / supervisor_resolve`；
+  身份只来自 `X-Auth-Token`（请求体自报角色被 `extra="forbid"` 直接 422）；
+- `check_policy` 100% 复用 Week 05 确定性引擎（金额>2000 / 零匹配 / 版本冲突 → needs_review）；
+- 三向对账键 `correlation_id` 贯穿：HTTP 响应 / `billing_tasks` 终态 / `task_action_runs` 审计。
+
+## 第 7 周测试矩阵（`python -m unittest discover -s tests -v`，全量 20/20）
+
+| 用例 | 验收点 | 关键证据 |
+| --- | --- | --- |
+| test_01 常规工单 check→confirm | 三向一致 + 可核验依据 | 响应/billing_tasks/task_action_runs 同 correlation_id；task_runs 亦有审计行 |
+| test_02 超限 2500 元 check→escalate | 显式阻断不猜答案 | needs_review + AMOUNT_EXCEEDS_LIMIT，候选政策为 None |
+| test_03 升级幂等 | 重复提交不重复生效 | ALREADY_APPLIED + is_idempotent=true，状态唯一 |
+| test_04 客服直调主管接口 | 服务端一票否决 + 零泄漏 | denied/ACTION_NOT_ALLOWED；响应全文无 POL-2026-REF-09 |
+| test_05 主管结案 | 三向一致 + 主管身份审计 | escalated→action_completed，user_role=supervisor |
+| test_06 请求体自报角色 | 前端不是安全屏障 | extra="forbid" → 422，零审计零变更 |
+| test_07 refuse + 非法 Token | 显式拒绝留痕；401 零副作用 | refused/REFUSED_BY_AGENT；401 后零审计零变更 |
+
+## 一线工作台 CLI 使用
+
+```powershell
+uvicorn application.main:app --port 8000        # 窗口 1
+python workbench_cli.py                          # 窗口 2：回车=客服身份 (token_agent_valid)，s=主管 (token_supervisor_secret)
+# 操作：选工单 → check_policy 核对 SOP 三要素 (版本/生效日期/来源) → confirm / refuse / escalate
+```
+
+## 第 7 周交付边界（诚实不夸大）
+
+Token 为模拟会话凭证（非生产 SSO）；同工单并发未加行锁（幂等键为第一道防线）；审计表无防篡改签名；
+走查反馈为课程内模拟角色扮演，不含任何未测量的采纳率/ROI 声明；生产化清单见 `decision-memo-02.md`。
+

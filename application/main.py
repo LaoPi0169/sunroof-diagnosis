@@ -1,15 +1,25 @@
 """
 FastAPI 应用入口 (API Gateway / Presentation Layer)
 挂载 HTTP 接口、管理服务端可信身份注入与请求路由
+
+Week 07: 新增一线任务闭环接口 /api/v1/tasks/action 与 /api/v1/tasks；
+鉴权依赖收敛至 application/auth.py (policy-check 语义保持完全不变)。
 """
 from contextlib import asynccontextmanager
-from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 
-from application.database import init_db
-from application.models import PolicyCheckRequest, PolicyCheckResponse, TrustedUser
+from application.auth import get_trusted_user_from_session
+from application.database import get_billing_task, init_db, list_billing_tasks
+from application.models import (
+    PolicyCheckRequest,
+    PolicyCheckResponse,
+    TaskActionRequest,
+    TaskResponse,
+    TrustedUser,
+)
 from application.services import process_policy_check
+from application.tasks import process_task_action
 
 
 @asynccontextmanager
@@ -21,32 +31,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Northstar Deterministic Policy Check API",
-    description="北辰协作 B2B 客服政策核对确定性垂直薄片 (Week 05)",
-    version="1.0.0",
+    description="北辰协作 B2B 客服政策核对确定性垂直薄片 (Week 05) + 一线角色任务闭环 (Week 07)",
+    version="1.1.0",
     lifespan=lifespan,
 )
-
-
-def get_trusted_user(x_auth_token: Optional[str] = Header(None)) -> TrustedUser:
-    """
-    服务端可信会话鉴权依赖:
-    身份完全从服务端 Header/Session 凭证获得，绝对不信任前端 JSON 请求体自报的角色。
-    """
-    if not x_auth_token:
-        # 默认使用通用客服测试身份（用于模拟正常流程）
-        return TrustedUser(user_id="agent_small_zhang", user_role="support_agent")
-
-    # 根据 Header Token 校验角色
-    if x_auth_token == "token_supervisor_secret":
-        return TrustedUser(user_id="supervisor_wang", user_role="supervisor")
-    elif x_auth_token == "token_agent_valid":
-        return TrustedUser(user_id="agent_small_zhang", user_role="support_agent")
-    else:
-        # 未知身份默认拒绝 (denied)：查询不执行、不落库
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
-        )
 
 
 @app.post(
@@ -57,13 +45,42 @@ def get_trusted_user(x_auth_token: Optional[str] = Header(None)) -> TrustedUser:
 )
 def policy_check_endpoint(
     request: PolicyCheckRequest,
-    trusted_user: TrustedUser = Depends(get_trusted_user),
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
 ) -> PolicyCheckResponse:
     """
     接受结构化客服请求，由后端进行 100% 确定性政策匹配，
     返回 answered 结果或结构化 needs_review 异常复核预览。
     """
     return process_policy_check(request=request, user=trusted_user)
+
+
+@app.post(
+    "/api/v1/tasks/action",
+    response_model=TaskResponse,
+    summary="执行一线任务动作 (check_policy/confirm/refuse/escalate/supervisor_resolve)",
+    status_code=status.HTTP_200_OK,
+)
+def task_action_endpoint(
+    request: TaskActionRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> TaskResponse:
+    """
+    任务状态机端点 (Week 07):
+    * 身份只来自服务端可信会话 (X-Auth-Token)，请求体自报角色由 extra="forbid" 直接 422;
+    * RBAC 一票否决 -> denied 路径 (candidate_policy 恒为 None, 审计留痕);
+    * 动作幂等, 重复提交返回 ALREADY_APPLIED。
+    """
+    if get_billing_task(request.task_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown task_id")
+    return process_task_action(request=request, user=trusted_user)
+
+
+@app.get("/api/v1/tasks", summary="列出工单任务队列 (一线工作台数据源)")
+def list_tasks_endpoint(
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+):
+    """返回工单队列 (结构化摘要, 不含政策正文与敏感内容)"""
+    return {"tasks": list_billing_tasks()}
 
 
 @app.get("/health", summary="健康检查")
