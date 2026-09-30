@@ -68,7 +68,7 @@ uvicorn application.main:app --reload --port 8000
 python -m unittest discover -s tests -v
 ```
 
-预期输出 `Ran 5 tests ... OK`。测试覆盖（每个用例均独立临时库，且同时核对 API 响应与 DB 终态）：
+预期输出 `Ran 13 tests ... OK`（Week 05 基线 5 个 + Week 06 摄取管道 8 个）。测试覆盖（每个用例均独立临时库，且同时核对 API 响应与 DB 终态）：
 
 | 用例 | 身份 / 输入 | 预期终态 | 必须核对 |
 | --- | --- | --- | --- |
@@ -103,3 +103,95 @@ Invoke-WebRequest -Uri http://127.0.0.1:8000/api/v1/policy-check -Method Post -B
 不使用模型 / RAG / 向量检索 / Agent / MCP；不自动撰写或发送客户回复；不拆微服务；
 不主管批准闭环（留待第 7 周双角色动作）；不声称生产、采用、效率或 ROI —— 全部为本地教学模拟。
 对 mission.md 参考实现的三处必要修正（DB 路径平台化 / list 下标缺陷 / 幂等初始化）记录于 ADR-001。
+
+---
+
+# Week 06 —— 建立可靠、可重放的数据入口（Ingestion）
+
+依据《FDE 成长手册》第 6 周交付：在 Week 05 确定性薄片之上，唯一新增的难度是**数据不再默认干净**。
+本周仍为**零大模型、100% 确定性规则**：每条数据进入可解释终态 —— `accepted`（带血缘入主表）/
+`duplicate`（不产生第二次业务效果）/ `quarantined`（携带原因码进隔离区，绝不静默丢弃）。
+
+- 数据合同：`data-contract-v1.md`（字段语义 / 业务键 / Default Deny / 日志边界）
+- 运维手册：`ingestion-runbook-v0.md`（排障 / 修复 / 重放 / 熔断 SOP）
+- 设计决策：`adr-002-ingestion-lineage.md`（对 mission 参考实现的适配记录）
+- 实测证据：`evidence/batch-reconciliation-proof.json`（真实运行产物）
+- 行为规格：`specs/mission-week-06.md` / `specs/business-background.md` 第 6 周
+
+## 摄取管道数据路径
+
+```
+[原始数据批次 BatchIngestionRequest (batch_id, source_id, rows)]
+      ▼
+[ingestion/service.py validate_row] ──> 数据合同校验（业务键→所有者→ACL→地区→时间）
+      ├── 校验失败  -> quarantine_records（原因码 + safe_source_ref + raw_payload 证据）
+      ├── 业务键重复 -> duplicate 计数 + 隔离表对账痕迹，主表零写入
+      └── 合法      -> policies 主表（血缘: source_id / source_version / batch_id / owner_id）
+      ▼
+[单事务原子提交 ingestion_batches] ──> 三处一致: input = accepted + duplicate + quarantined
+[定向重放 execute_targeted_replay] ──> 原子事务: 主表(replay-{replay_id}) + resolved + 重放审计
+```
+
+## Week 06 新增目录
+
+```
+├── data-contract-v1.md                     # 数据合同 v1
+├── ingestion-runbook-v0.md                 # 数据运维与隔离区排障 Runbook
+├── adr-002-ingestion-lineage.md            # 摄取血缘设计决策
+├── migrations/002_ingestion_schema.sql     # 批次/隔离/重放审计 DDL
+├── ingestion/
+│   ├── schema.py                           # 数据合同 DTO 与枚举
+│   ├── repository.py                       # 持久化层（含原子重放事务与对账）
+│   └── service.py                          # 校验/分流/幂等/定向重放 + 安全日志
+├── evidence/batch-reconciliation-proof.json
+└── tests/test_ingestion_reliability.py     # 8 个可靠性集成测试
+```
+
+## Week 06 快速验证
+
+```powershell
+# 全量测试（Week 05 基线 5 个 + Week 06 摄取 8 个，预期 Ran 13 tests ... OK）
+python -m unittest discover -s tests -v
+
+# 仅运行摄取可靠性测试
+python -m unittest tests.test_ingestion_reliability -v
+```
+
+测试覆盖对照验收标准：
+
+| 用例 | 验收标准 | 核对点 |
+| --- | --- | --- |
+| test_01 首次摄取 | 三处一致 / 血缘可追溯 / 无静默丢弃 | 6 行 = 3 accepted + 1 duplicate + 2 quarantined；主表与隔离区行数、原因码、`safe_source_ref` |
+| test_02 批次重跑 | 批次幂等 | 同 `batch_id` 重跑零写副作用，原审计行不被覆盖，无第二个当前版本 |
+| test_03 定向重放 | 可重放且保留历史 | 修复行入主表（`replay-` 前缀血缘），隔离记录 `resolved` + `replay_id`，原 `raw_payload` 不变 |
+| test_04 重放拒绝 | 无假成功 | 未修复/已 resolved 的重放被拒，隔离状态不变，失败尝试也落审计 |
+| test_05 默认拒绝 | Default Deny | 未知/缺失 `access_level` 绝不入主表，supervisor 数据不降级 |
+| test_06 日志安全 | 结构化日志不泄密 | 16 个敏感标记（正文/公式/所有者/政策 ID）逐一断言不存在；对账公式可从日志核对 |
+| test_07 跨批次重复 + 种子血缘 | 重复不产生第二次业务效果 | 新批次推送同业务键判 `duplicate`；Week 05 种子回填 `week05-baseline-seed` 血缘 |
+| test_08 回接 Week 05 | 通过质量门的数据可服务业务 | 摄取数据进入 Week 05 确定性查询：重放前 `answered`，多版本后确定性 `POLICY_CONFLICT` |
+
+## 摄取调用示例
+
+```python
+from ingestion.schema import BatchIngestionRequest, ReplayRequest
+from ingestion.service import execute_targeted_replay, process_batch_ingestion
+
+result = process_batch_ingestion(BatchIngestionRequest(
+    batch_id="batch-w06-20260825-a",
+    source_id="northstar-policy-export-v1",
+    source_version="v1.0",
+    correlation_id="ing-w06-a-001",
+    rows=[{"policy_id": "POL-PLAN-01", "source_version": "v3", ...}],  # 见 data-contract-v1.md
+))
+# result.status == "completed_with_quarantine"；隔离记录修复后:
+replay = execute_targeted_replay(ReplayRequest(
+    quarantine_id="quar-...", replayed_by="knowledge-admin",
+    fixed_payload={"owner_id": "knowledge-refund"},   # 支持部分补丁
+))
+```
+
+## Week 06 交付边界（诚实不夸大）
+
+摄取批次 `completed` 不等于数据质量完美，`completed_with_quarantine` 是正常运营状态；
+本周不宣称用户采用、效率或商业 ROI；不实现流式/回填/多源对账平台（Week 06 明确不做）；
+业务键唯一性由应用层三层防线保证（见 ADR-002 D1），多写入方并发唯一索引留待后续周。
