@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://northstar.example/api-contract/policy-check-v1.json",
+  "title": "policy-check-v1",
+  "description": "POST /api/v1/policy-check —— Week 05 确定性垂直薄片接口契约。回链 northstar-discovery-brief-v1；身份只从服务端 X-Auth-Token 取得，请求体不携带任何身份字段；缺字段不填默认值，未知身份默认拒绝。",
+  "x-endpoint": {
+    "method": "POST",
+    "path": "/api/v1/policy-check",
+    "health": "GET /health",
+    "auth": {
+      "in": "header",
+      "name": "X-Auth-Token",
+      "rules": {
+        "token_agent_valid": "support_agent / agent_small_zhang",
+        "token_supervisor_secret": "supervisor / supervisor_wang（可见全部政策）",
+        "缺失": "默认客服测试身份（教学模拟服务端会话）",
+        "非法": "401 denied，查询不执行、不落库"
+      }
+    },
+    "success_status": 200,
+    "error_statuses": [401, 422],
+    "versioning": "路径版本 /api/v1；不兼容变更必须升级为 policy-check-v2"
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/policyCheckResponse" },
+    { "$ref": "#/$defs/errorResponse" }
+  ],
+  "$defs": {
+    "policyCheckRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "task_type", "region", "purchased_at"],
+      "properties": {
+        "request_id": { "type": "string", "minLength": 1, "description": "三向对账关联标识（UUID）" },
+        "task_type": { "type": "string", "enum": ["billing_policy_check"], "description": "本周唯一支持的任务类型" },
+        "region": { "type": "string", "enum": ["华东", "华南", "华北", "全国"], "description": "客户所属地区；缺失不得默认填充" },
+        "purchased_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "购买时间 ISO-8601 日期" },
+        "amount": { "type": "number", "minimum": 0, "default": 0, "description": "涉及变动金额；>2000 触发主管复核" }
+      }
+    },
+    "policyDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "title", "version", "effective_at", "source_id", "formula_rule"],
+      "properties": {
+        "policy_id": { "type": "string" },
+        "title": { "type": "string" },
+        "version": { "type": "string" },
+        "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "source_id": { "type": "string", "description": "可核验来源 ID（客服回源依据）" },
+        "formula_rule": { "type": "string", "description": "确定性公式规则（结构化，非模型生成）" }
+      }
+    },
+    "escalationPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_role", "suggested_action", "reason"],
+      "properties": {
+        "target_role": { "type": "string", "default": "supervisor" },
+        "suggested_action": { "type": "string" },
+        "reason": { "type": "string", "description": "面向人工复核的安全原因说明（不含政策正文）" }
+      }
+    },
+    "policyCheckResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "status", "eligible"],
+      "properties": {
+        "request_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["answered", "needs_review", "denied"] },
+        "eligible": { "type": "boolean" },
+        "policy_details": {
+          "description": "仅 status=answered 时返回；异常时必须为 null",
+          "oneOf": [{ "$ref": "#/$defs/policyDetails" }, { "type": "null" }]
+        },
+        "reason_code": {
+          "description": "异常时的结构化原因码；成功时为 null",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "MISSING_REQUIRED_PARAM",
+                "POLICY_CONFLICT",
+                "AMOUNT_EXCEEDS_LIMIT",
+                "NO_MATCHING_POLICY",
+                "UNAUTHORIZED_ACCESS"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "escalation_preview": {
+          "description": "无副作用的复核预览；成功时为 null",
+          "oneOf": [{ "$ref": "#/$defs/escalationPreview" }, { "type": "null" }]
+        }
+      }
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["detail"],
+      "properties": {
+        "detail": {
+          "description": "401: 鉴权失败字符串；422: FastAPI 结构化校验错误数组（缺失字段不填默认值、不落库）"
+        }
+      }
+    }
+  }
+}
