@@ -18,9 +18,10 @@ _DEFAULT_DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), os.pardir, "data", "northstar.db"
 )
 
-# 迁移脚本按序执行 (001 = Week 05 基线 DDL + Fixtures; 002 = Week 06 摄取/隔离/重放表)
+# 迁移脚本按序执行 (001 = Week 05 基线 DDL + Fixtures; 002 = Week 06 摄取/隔离/重放表;
+#                     003 = Week 07 工单表 + 任务动作审计表 + 工单夹具)
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "migrations")
-MIGRATION_SCRIPTS = ["001_init_schema.sql", "002_ingestion_schema.sql"]
+MIGRATION_SCRIPTS = ["001_init_schema.sql", "002_ingestion_schema.sql", "003_tasks_and_permissions_schema.sql"]
 
 # Week 06 血缘列: 通过幂等 ALTER 追加到 Week 05 已冻结的 policies 表，
 # 不重建表、不改动既有主键 (policy_id, version) 与三条种子 Fixtures。
@@ -160,3 +161,103 @@ def get_task_run_by_request_id(request_id: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
     finally:
         conn.close()
+
+
+# ============================================================================
+# Week 07: 客服工单任务表与动作审计 (回链 specs/mission-week-07.md 第 2 天)
+# 现有 Week 05/06 函数零改动 —— 仅追加新能力。
+# ============================================================================
+
+
+def get_billing_task(task_id: str) -> Optional[Dict[str, Any]]:
+    """按 task_id 读取工单终态 (任务状态机的唯一事实来源)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM billing_tasks WHERE task_id = ?", (task_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_billing_tasks() -> List[Dict[str, Any]]:
+    """列出全部工单 (一线工作台任务队列数据源)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM billing_tasks ORDER BY created_at ASC, task_id ASC")
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def update_billing_task_state(
+    task_id: str,
+    status: str,
+    reason_code: Optional[str] = None,
+    matched_policy_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+) -> None:
+    """写入工单终态 (单事务); None 字段用 COALESCE 保留原值，保证幂等重放不覆盖既有依据"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE billing_tasks
+            SET status = ?,
+                reason_code = COALESCE(?, reason_code),
+                matched_policy_id = COALESCE(?, matched_policy_id),
+                idempotency_key = COALESCE(?, idempotency_key),
+                updated_at = datetime('now')
+            WHERE task_id = ?
+            """,
+            (status, reason_code, matched_policy_id, idempotency_key, task_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_task_action_run(
+    task_id: str,
+    correlation_id: str,
+    user_id: str,
+    user_role: str,
+    action: str,
+    status: str,
+    reason_code: Optional[str] = None,
+) -> str:
+    """记录一条任务动作审计事件 (三向对账锚点: 响应 / billing_tasks / 本表)"""
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO task_action_runs
+                (run_id, task_id, correlation_id, user_id, user_role, action, status, reason_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (run_id, task_id, correlation_id, user_id, user_role, action, status, reason_code),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return run_id
+
+
+def get_task_action_runs_by_correlation(correlation_id: str) -> List[Dict[str, Any]]:
+    """按 correlation_id 汇集动作审计流水，供 E2E 测试三向对账断言"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM task_action_runs WHERE correlation_id = ? ORDER BY created_at ASC, run_id ASC",
+            (correlation_id,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
