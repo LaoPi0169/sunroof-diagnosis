@@ -249,12 +249,12 @@ def record_task_action_run(
 
 
 def get_task_action_runs_by_correlation(correlation_id: str) -> List[Dict[str, Any]]:
-    """按 correlation_id 汇集动作审计流水，供 E2E 测试三向对账断言"""
+    """按 correlation_id 汇集动作审计流水，供 E2E 测试三向对账断言 (按插入序 rowid 排序)"""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM task_action_runs WHERE correlation_id = ? ORDER BY created_at ASC, run_id ASC",
+            "SELECT * FROM task_action_runs WHERE correlation_id = ? ORDER BY rowid ASC",
             (correlation_id,),
         )
         return [dict(row) for row in cursor.fetchall()]

@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS task_action_runs (
     action         TEXT NOT NULL,                     -- check_policy/confirm/refuse/escalate/supervisor_resolve
     status         TEXT NOT NULL,                     -- 本次动作产生的任务终态 (denied 表示被安全阻断)
     reason_code    TEXT,                              -- 结构化原因码 (如 ALREADY_APPLIED / ACTION_NOT_ALLOWED)
-    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),  -- 毫秒精度
     FOREIGN KEY (task_id) REFERENCES billing_tasks(task_id)
 );
 
