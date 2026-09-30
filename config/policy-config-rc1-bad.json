@@ -1,0 +1,32 @@
+{
+  "config_version": "northstar-config-w08-rc1-bad",
+  "release_id": "northstar-app-w08-rc1",
+  "description": "回滚演练专用错误配置 (Day 4 受控失败注入): 误将已废弃的 2025 旧政策 POL-2025-BIL-01 标记为当前生效, 复现 mission-week-08 第 4 天注入场景。该配置会导致华东/2026-08-15 工单同时命中 v1+v3 两个版本 (POLICY_CONFLICT), 任务级冒烟应拦截。禁止用于真实发布, 仅作为演练证据归档。",
+  "policy_baseline": [
+    {
+      "policy_id": "POL-2026-BIL-01",
+      "is_deprecated": 0,
+      "effective_at": "2026-01-01",
+      "expires_at": null
+    },
+    {
+      "policy_id": "POL-2025-BIL-01",
+      "is_deprecated": 1,
+      "effective_at": "2025-01-01",
+      "expires_at": "2025-12-31"
+    },
+    {
+      "policy_id": "POL-2026-REF-09",
+      "is_deprecated": 0,
+      "effective_at": "2026-07-01",
+      "expires_at": null
+    }
+  ],
+  "policy_overrides": [
+    {
+      "policy_id": "POL-2025-BIL-01",
+      "is_deprecated": 0,
+      "expires_at": "2027-12-31"
+    }
+  ]
+}

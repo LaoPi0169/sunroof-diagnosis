@@ -262,3 +262,53 @@ python workbench_cli.py                          # 窗口 2：回车=客服身�
 Token 为模拟会话凭证（非生产 SSO）；同工单并发未加行锁（幂等键为第一道防线）；审计表无防篡改签名；
 走查反馈为课程内模拟角色扮演，不含任何未测量的采纳率/ROI 声明；生产化清单见 `decision-memo-02.md`。
 
+---
+
+# Week 08 —— 可重复部署与回滚（配置收敛层 + 发布清单 + CI + 任务级部署门）
+
+依据 `specs/mission-week-08.md`：在冻结的 Week 07 代码之上新增**部署配置层**，让"部署 = 代码基线 +
+配置收敛 + 任务级冒烟验收"成为可重复动作；回滚是**配置收敛式**的（不删库、不改 DDL）。
+
+## 第 8 周新增结构
+
+```
+fde-course-week-05/
+├── release-manifest-v1.json            # 发布清单：code_revision=week07-baseline / config sha256 / schema 003
+├── config/
+│   ├── policy-config.json              # 发布配置 (known-good)：policy_baseline 收敛断言 + policy_overrides
+│   └── policy-config-rc1-bad.json      # 回滚演练专用错误配置（受控注入证据，禁止真实发布）
+├── deploy/
+│   ├── apply_policy_config.py          # 配置收敛器：幂等 UPDATE，仅触碰白名单三列，不建表不删库
+│   └── smoke_w08.py                    # 任务级冒烟 4 条（三向对账，纯标准库）
+├── ci/
+│   ├── run_local_ci.py                 # 本地 CI 四阶段流水线（= GitHub Actions 同一入口）
+│   └── redaction_scan.py               # 日志脱敏静态扫描（凭据/政策正文不入运行时输出）
+├── .github/workflows/ci.yml            # push/PR 触发，四阶段同一入口
+├── deploy-README.md                    # 第三方视角部署手册（干净环境零假设）
+├── ci-evidence.md                      # CI 运行证据（含两轮真实拦截与处置）
+├── task-smoke-results-v1.md            # 真实干净目录部署 + 4/4 冒烟结果
+├── rollback-drill-v1.md                # 注入→拦截→回滚→复验 演练报告
+├── basic-observability-note-v1.md      # 基础可观测性说明（关联标识/错误码/脱敏裁决）
+├── data-application-stage-exit-v1.md   # 第 5–8 周阶段退出记录
+└── tests/test_deployment_release.py    # 9 个部署/发布自动化用例（全量 29/29）
+```
+
+## 第 8 周验证方式
+
+```powershell
+# 全量自动化测试（Week 05 基线 5 + Week 06 摄取 8 + Week 07 任务 7 + Week 08 部署 9）
+python -m unittest discover -s tests -v          # 预期 Ran 29 tests ... OK
+
+# 本地 CI 四阶段（schema / 全量测试 / 脱敏扫描 / 干净环境任务冒烟）
+python ci/run_local_ci.py                        # 预期 4/4 阶段 PASS，退出码 0
+```
+
+部署与回滚：见 `deploy-README.md`（第三方部署步骤）与 `ROLLBACK.md`（配置收敛式回滚）。
+核心不变量：`/health` 200 ≠ 业务正确 —— 部署放量以 `deploy/smoke_w08.py` 4/4 通过为验收门。
+
+## 第 8 周交付边界（诚实不夸大）
+
+回滚对象是配置数据而非代码（不含 DDL 回退）；冒烟要求全新初始化数据库（一次性前置）；全部演练在单机
+沙盒完成，不声称生产就绪、热回滚或组织级 ROI；配置内容正确性靠人工评审 + 任务冒烟门双防线，收敛器不判对错。
+
+

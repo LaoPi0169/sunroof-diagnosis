@@ -1,0 +1,62 @@
+{
+  "manifest_version": 1,
+  "release_id": "northstar-app-w08-r0",
+  "artifact_id": "build-fde-w08-20260930-01",
+  "built_at_utc": "2026-09-30T09:15:07Z",
+  "code_revision": "0b3d8aed734ac4d250e78e493aeede615c9c4424",
+  "code_revision_source": "git tag week07-baseline (Week 07 验收后的冻结应用运行时代码; application/ 与 migrations/ 在本发布内零改动)",
+  "tooling_revision": "128f47f9c64beab0472274765ad5caca875743f4",
+  "tooling_scope": "config/ + deploy/ + ci/ + .github/workflows (发布配置层、幂等收敛器、任务冒烟、本地 CI; 不触碰冻结应用代码)",
+  "schema_version": "003",
+  "schema_files": [
+    "migrations/001_init_schema.sql",
+    "migrations/002_ingestion_schema.sql",
+    "migrations/003_tasks_and_permissions_schema.sql"
+  ],
+  "config_version": "northstar-config-w08-v1",
+  "config_path": "config/policy-config.json",
+  "config_sha256": "625f1159104457abf77e656be20cce387887cbccc0736c07e65a57ec19ecb7d1",
+  "fixtures_version": "fixtures-w07-r1",
+  "fixtures_detail": {
+    "policies": [
+      { "policy_id": "POL-2026-BIL-01", "version": "v3", "region": "华东", "agent_visible": true, "effective_at": "2026-01-01", "expires_at": null, "is_deprecated": false },
+      { "policy_id": "POL-2025-BIL-01", "version": "v1", "region": "华东", "deprecated": true, "expires_at": "2025-12-31" },
+      { "policy_id": "POL-2026-REF-09", "version": "v1", "access_level": "supervisor", "note": "主管专属, 一线不可见" }
+    ],
+    "billing_tasks": [
+      { "task_id": "TASK-W07-001", "region": "华东", "amount": 500.0, "purchased_at": "2026-08-15", "initial_status": "initialized" },
+      { "task_id": "TASK-W07-002", "region": "华东", "amount": 2500.0, "purchased_at": "2026-08-15", "initial_status": "initialized" }
+    ]
+  },
+  "smoke_suite": {
+    "script": "deploy/smoke_w08.py",
+    "cases": ["SMOKE-01 常规确认", "SMOKE-02 高金额升级", "SMOKE-03 越权零泄漏", "SMOKE-04 幂等重放"],
+    "reconciliation": "一线响应 + billing_tasks 终态 + task_action_runs 审计 (check 动作另有 Week 05 task_runs 审计), correlation_id 关联"
+  },
+  "previous_known_good_release": {
+    "release_id": "northstar-app-w07-r0",
+    "code_revision": "0b3d8aed734ac4d250e78e493aeede615c9c4424",
+    "git_tag": "week07-baseline",
+    "schema_version": "003",
+    "config_version": "code-defaults-v1",
+    "note": "上一已知良好发布: 同一代码基线 (week07-baseline), 无配置文件层, 行为由代码内默认夹具决定。回滚目标即恢复该行为口径。"
+  },
+  "rollback_policy": {
+    "strategy": "config-convergence",
+    "steps": "apply_policy_config.py --config config/policy-config.json --db <db> (幂等 UPDATE 收敛回 known-good 断言)",
+    "non_goals": ["不删库", "不重建冻结表", "不改 DDL", "schema_version 保持 003 不变"],
+    "guarantee": "数据库兼容性: 收敛仅触碰 policies 表的 is_deprecated/effective_at/expires_at 三列白名单"
+  },
+  "verification": {
+    "test_command": "python ci/run_local_ci.py",
+    "unittest_total_at_previous_release": 20,
+    "unittest_total_at_this_release": 29,
+    "ci_stages": ["STAGE-1-schema", "STAGE-2-unittest", "STAGE-3-redaction", "STAGE-4-clean-env-smoke"],
+    "evidence": ["ci-evidence.md", "evidence/ci-run-w08.log", "task-smoke-results-v1.md", "rollback-drill-v1.md"]
+  },
+  "non_goals": [
+    "不引入任何模型调用或不确定性 (全链路确定性)",
+    "不改 Week 05/06/07 冻结契约 (响应字段/审计语义/幂等行为)",
+    "不做数据库 DDL 变更或删库式回滚"
+  ]
+}

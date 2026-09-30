@@ -1,0 +1,26 @@
+{
+  "config_version": "northstar-config-w08-v1",
+  "release_id": "northstar-app-w08-r0",
+  "description": "北辰确定性系统发布冻结配置 (known-good)。policy_baseline 为部署后数据库必须收敛到的冻结夹具断言; policy_overrides 为空表示不做任何增量变更。apply_policy_config.py 以幂等 UPDATE 收敛数据库到本基线: 不建表、不删库、不改动 Week 05/06/07 冻结 DDL 与契约。",
+  "policy_baseline": [
+    {
+      "policy_id": "POL-2026-BIL-01",
+      "is_deprecated": 0,
+      "effective_at": "2026-01-01",
+      "expires_at": null
+    },
+    {
+      "policy_id": "POL-2025-BIL-01",
+      "is_deprecated": 1,
+      "effective_at": "2025-01-01",
+      "expires_at": "2025-12-31"
+    },
+    {
+      "policy_id": "POL-2026-REF-09",
+      "is_deprecated": 0,
+      "effective_at": "2026-07-01",
+      "expires_at": null
+    }
+  ],
+  "policy_overrides": []
+}
