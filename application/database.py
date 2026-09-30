@@ -18,9 +18,20 @@ _DEFAULT_DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), os.pardir, "data", "northstar.db"
 )
 
-SQL_SCRIPT_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), os.pardir, "migrations", "001_init_schema.sql"
-)
+# 迁移脚本按序执行 (001 = Week 05 基线 DDL + Fixtures; 002 = Week 06 摄取/隔离/重放表)
+MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "migrations")
+MIGRATION_SCRIPTS = ["001_init_schema.sql", "002_ingestion_schema.sql"]
+
+# Week 06 血缘列: 通过幂等 ALTER 追加到 Week 05 已冻结的 policies 表，
+# 不重建表、不改动既有主键 (policy_id, version) 与三条种子 Fixtures。
+POLICY_LINEAGE_COLUMNS = {
+    "source_version": "TEXT NOT NULL DEFAULT ''",  # 上游源版本 (业务键 policy_id:source_version)
+    "owner_id": "TEXT",                            # 知识所有者 (缺失即隔离)
+    "batch_id": "TEXT NOT NULL DEFAULT ''",        # 摄取批次 (血缘/对账锚点)
+}
+
+# Week 05 种子数据的血缘口径: 迁移后统一回填，使主表每个业务版本均可追溯
+SEED_BATCH_ID = "week05-baseline-seed"
 
 
 def _get_db_path() -> str:
@@ -37,15 +48,39 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_policy_lineage_columns(conn: sqlite3.Connection) -> None:
+    """幂等为 policies 表补齐 Week 06 血缘列 (PRAGMA 检查后 ALTER)，并创建对账索引。"""
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(policies)")}
+    for column, ddl in POLICY_LINEAGE_COLUMNS.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE policies ADD COLUMN {column} {ddl}")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_policies_batch ON policies (batch_id)"
+    )
+
+
 def init_db(db_path: Optional[str] = None) -> None:
-    """根据 migration SQL 脚本初始化数据库表结构与 Fixtures (幂等，可重复执行)。"""
+    """按序执行迁移脚本初始化数据库 (幂等，可重复执行):
+    1. 001_init_schema.sql: Week 05 表结构 + 固定 Fixtures (IF NOT EXISTS / OR IGNORE)
+    2. 002_ingestion_schema.sql: Week 06 批次 / 隔离区 / 重放审计表
+    3. 幂等补齐 policies 血缘列 (source_version / owner_id / batch_id) 并回填种子血缘
+    """
     path = db_path or _get_db_path()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     conn = sqlite3.connect(path)
     try:
-        with open(SQL_SCRIPT_PATH, "r", encoding="utf-8") as f:
-            sql_script = f.read()
-        conn.executescript(sql_script)
+        for script_name in MIGRATION_SCRIPTS:
+            script_path = os.path.join(MIGRATIONS_DIR, script_name)
+            with open(script_path, "r", encoding="utf-8") as f:
+                conn.executescript(f.read())
+        _ensure_policy_lineage_columns(conn)
+        # 种子血缘回填 (幂等): 仅命中血缘列为空的历史行，不触碰摄取管道写入的数据
+        conn.execute(
+            "UPDATE policies SET batch_id = ? WHERE batch_id = ''", (SEED_BATCH_ID,)
+        )
+        conn.execute(
+            "UPDATE policies SET source_version = version WHERE source_version = ''"
+        )
         conn.commit()
     finally:
         conn.close()
