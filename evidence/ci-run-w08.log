@@ -1,0 +1,62 @@
+CI RUN 2026-09-30T09:10:51+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 20 tests in 3.867s, exit=0
+Ran 20 tests in 3.867s
+
+OK
+[FAIL] STAGE-3-redaction :: redaction scan output unparsable, exit=1
+etail": "凭据常量出现在非授权文件: toke***"
+    },
+    {
+      "file": "ci\\redaction_scan.py",
+      "line": 54,
+      "rule": "secret_literal_outside_allowlist",
+      "detail": "凭据常量出现在非授权文件: toke***"
+    },
+    {
+      "file": "ci\\redaction_scan.py",
+      "line": 54,
+      "rule": "secret_literal_outside_allowlist",
+      "detail": "凭据常量出现在非授权文件: toke***"
+    }
+  ],
+  "passed": false
+}
+
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=54503; smokes_passed=4/4
+CI RESULT FAILED | duration=10.4s | 2026-09-30T09:11:01+00:00 (UTC)
+
+CI RUN 2026-09-30T09:11:35+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 20 tests in 2.977s, exit=0
+Ran 20 tests in 2.977s
+
+OK
+[FAIL] STAGE-3-redaction :: redaction scan output unparsable, exit=1
+{
+  "scanned_files": 11,
+  "emissions_checked": 39,
+  "violations": [
+    {
+      "file": "workbench_cli.py",
+      "line": 88,
+      "rule": "secret_or_body_in_emission",
+      "detail": "输出语句包含敏感标记: form***"
+    }
+  ],
+  "passed": false
+}
+
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=58573; smokes_passed=4/4
+CI RESULT FAILED | duration=6.7s | 2026-09-30T09:11:42+00:00 (UTC)
+
+CI RUN 2026-09-30T09:13:22+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 20 tests in 2.921s, exit=0
+Ran 20 tests in 2.921s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=11, emissions_checked=39, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=63939; smokes_passed=4/4
+CI RESULT OK | duration=5.2s | 2026-09-30T09:13:27+00:00 (UTC)
+
