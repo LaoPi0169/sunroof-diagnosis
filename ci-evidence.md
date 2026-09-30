@@ -43,7 +43,7 @@ CI 触发条件：`push`（main/week08）、`pull_request`、`workflow_dispatch`
    仅 `workbench_cli.py` 客户端授权展示豁免。
 该裁决的完整论证见 Day 5 文档 `basic-observability-note-v1.md`。
 
-### Run 3（终态）：4/4 PASS
+### Run 3（工具链终态）：4/4 PASS
 
 ```
 [PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
@@ -52,6 +52,21 @@ CI 触发条件：`push`（main/week08）、`pull_request`、`workflow_dispatch`
 [PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=63939; smokes_passed=4/4
 CI RESULT OK
 ```
+
+### Run 4（Week 08 验收终态）：4/4 PASS，测试规模 20→29
+
+部署/发布自动化用例（`tests/test_deployment_release.py`，9 个）合入后的完整验收：
+
+```
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 29 tests in 6.339s, exit=0  (OK)
+[PASS] STAGE-3-redaction :: scanned_files=11, emissions_checked=39, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=58958; smokes_passed=4/4
+CI RESULT OK
+```
+
+覆盖：manifest 全绑定 / 收敛器幂等与 fail-fast / git archive 干净环境部署 / 四条任务冒烟三向对账 /
+动态脱敏（响应+审计+服务端日志）/ 注入→拦截→回滚→全新库复验 4/4 / 文档一致性 / CI 定义 / 静态扫描回归。
 
 ## 三、结论
 

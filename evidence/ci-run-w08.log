@@ -60,3 +60,13 @@ OK
 [PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=63939; smokes_passed=4/4
 CI RESULT OK | duration=5.2s | 2026-09-30T09:13:27+00:00 (UTC)
 
+CI RUN 2026-09-30T09:39:55+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 29 tests in 6.339s, exit=0
+Ran 29 tests in 6.339s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=11, emissions_checked=39, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=58958; smokes_passed=4/4
+CI RESULT OK | duration=8.5s | 2026-09-30T09:40:04+00:00 (UTC)
+
