@@ -1,0 +1,64 @@
+{
+  "proof_metadata": {
+    "timestamp": "2026-09-30T03:27:11Z",
+    "environment": "FDE Week 06 Sandbox · Windows Windows 11 · Python 3.13.15 · SQLite 3",
+    "verifier": "FDE Reliable Ingestion Engine v1.0 (13/13 automated tests green)"
+  },
+  "batch_execution_summary": {
+    "batch_id": "batch-w06-20260825-a",
+    "source_id": "northstar-policy-export-v1",
+    "correlation_id": "ing-w06-a-001",
+    "total_rows": 6,
+    "accepted_count": 3,
+    "duplicate_count": 1,
+    "quarantined_count": 2,
+    "status": "completed_with_quarantine",
+    "is_idempotent_replay": false,
+    "quarantine_summary": {
+      "DUPLICATE_BUSINESS_KEY": 1,
+      "MISSING_OWNER": 1,
+      "INVALID_EFFECTIVE_RANGE": 1
+    }
+  },
+  "idempotent_rerun_test": {
+    "batch_id": "batch-w06-20260825-a",
+    "source_id": "northstar-policy-export-v1",
+    "correlation_id": "ing-w06-a-001",
+    "total_rows": 6,
+    "accepted_count": 3,
+    "duplicate_count": 1,
+    "quarantined_count": 2,
+    "status": "completed_with_quarantine",
+    "is_idempotent_replay": true,
+    "quarantine_summary": {}
+  },
+  "three_way_reconciliation": {
+    "batch_id": "batch-w06-20260825-a",
+    "total_input_rows": 6,
+    "recorded_accepted": 3,
+    "recorded_duplicate": 1,
+    "recorded_quarantined": 2,
+    "accepted_in_policies_table": 3,
+    "quarantined_in_quarantine_table": 3,
+    "resolved_quarantine_records": 0,
+    "three_way_consistent": true
+  },
+  "targeted_replay_execution": {
+    "replay_id": "rep-b866b2b74e",
+    "quarantine_id": "quar-8e279e7aa7dc",
+    "status": "success",
+    "accepted_policy_id": "POL-REFUND-02",
+    "message": "Quarantined record fixed and successfully replayed into policies table"
+  },
+  "three_way_reconciliation_after_replay": {
+    "batch_id": "batch-w06-20260825-a",
+    "total_input_rows": 6,
+    "recorded_accepted": 3,
+    "recorded_duplicate": 1,
+    "recorded_quarantined": 2,
+    "accepted_in_policies_table": 3,
+    "quarantined_in_quarantine_table": 3,
+    "resolved_quarantine_records": 1,
+    "three_way_consistent": true
+  }
+}
