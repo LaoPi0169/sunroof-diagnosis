@@ -38,6 +38,9 @@ SCOPE_FILES = [
     os.path.join("ci", "run_local_ci.py"),
     os.path.join("corpus", "build_corpus.py"),
     os.path.join("corpus", "check_role_candidates.py"),
+    os.path.join("evaluation", "eval_contract.py"),
+    os.path.join("evaluation", "validate_eval_set.py"),
+    os.path.join("evaluation", "run_deterministic_baseline.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)
