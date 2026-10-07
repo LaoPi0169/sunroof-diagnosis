@@ -334,7 +334,7 @@ fde-course-week-05/
 ├─ role-candidate-check-v1.md          # 交付物：模型调用前三档角色原始候选检查（0 泄漏）
 ├─ corpus-card-v1.md                   # 交付物：语料卡片
 ├─ source-review-note-v1.md            # 交付物：知识所有者回读记录（模拟）
-└─ tests/test_corpus_governance.py     # 6 个语料治理用例（全量 35/35）
+└─ tests/test_corpus_governance.py     # 6 个语料治理用例（全量 35/35；第 10 周 +6 → 41/41）
 ```
 
 ## 五态路由与权限下推
@@ -358,8 +358,12 @@ python corpus/build_corpus.py --db data\corpus-w09.db --manifest corpus-manifest
 # 三档角色原始候选检查（agent 13 / supervisor 18 / unknown 0；泄漏时退出码 1）
 python corpus/check_role_candidates.py --db data\corpus-w09.db
 
-# 全量自动化测试（Week 05 基线 5 + Week 06 摄取 8 + Week 07 任务 7 + Week 08 部署 9 + Week 09 语料 6）
-python -m unittest discover -s tests -v          # 预期 Ran 35 tests ... OK
+# 全量自动化测试（Week 05 基线 5 + Week 06 摄取 8 + Week 07 任务 7 + Week 08 部署 9 + Week 09 语料 6 + Week 10 评测合同 6）
+python -m unittest discover -s tests -v          # 预期 Ran 41 tests ... OK
+
+# 第 10 周评测件校验 + 确定性基线（零模型调用；两次运行逐字节一致）
+python evaluation\validate_eval_set.py           # 60 行矩阵/封存/近重复/语料引用校验
+python evaluation\run_deterministic_baseline.py  # deterministic-baseline-results-v1.jsonl
 ```
 
 冻结面说明：语料两表 schema 独立存放于 `corpus/corpus_schema.sql`，不进入
@@ -372,4 +376,41 @@ python -m unittest discover -s tests -v          # 预期 Ran 35 tests ... OK
 本周只证明"语料可被治理成权限受控、可重复构建的快照"：不宣称检索质量、不宣称 RAG 改善任务
 （留给第 10–12 周冻结评测合同）；材料为教学合成（synthetic=true），无真实客户正文；
 冲突对（upgrade-east-v2 vs upgrade-notice-v4）在所有者裁决前不得作为任何答案依据。
+
+## 第 10 周：冻结评测合同（先冻结，后调优）
+
+在运行任何 RAG 候选**之前**交付：评测计划（决定/非目标/七层指标/硬门）、
+60 条评测考卷（36 开发 + 12 校准 + 12 标签封存保留；24 可回答 / 10 无答案 / 8 冲突 /
+8 过期 / 10 权限受限）、确定性基线逐例结果、数据卡、标注指南、泄漏检查与冻结记录。
+
+```
+eval-plan-v1.md                        # 预注册：决定、指标分层、门槛、失败动作、开除线
+eval-set-v1.jsonl                      # 60 条考卷输入（不含任何标签字段）
+eval-holdout-labels-sealed-v1.json     # 保留集封存标签（sha256 入冻结记录，第 12 周后解封一次）
+labeling-guide-v1.md                   # 判例口径 + 开发/校准 48 条公开标签附录
+dataset-card-v1.md / split-leakage-check-v1.md / evaluation-freeze-record-v1.md
+deterministic-baseline-results-v1.jsonl# w08-r0 逐例基线（answered 24 / needs_review 4 / not_applicable 20 / sealed 12）
+evaluation/eval_contract.py            # 合同常量与装载器（矩阵/封存/绑定）
+evaluation/validate_eval_set.py        # 确定性校验器（结构/矩阵/近重复/语料引用/封存）
+evaluation/run_deterministic_baseline.py # 100% 复用 w08 引擎与 w09 ACL 候选 SQL 的只读探针
+tests/test_eval_contract.py            # 6 个评测合同用例（全量 41/41）
+```
+
+### 第 10 周验证方式
+
+```powershell
+# 评测集校验（60 行、矩阵逐格精确、近重复零泄漏、封存边界、语料引用可解析）
+python evaluation\validate_eval_set.py
+
+# 确定性基线（零模型调用；request_id 由 case_id 派生，两次运行逐字节一致）
+python evaluation\run_deterministic_baseline.py
+```
+
+### 第 10 周交付边界（诚实不夸大）
+
+本周只证明"评测合同与 60 条考卷已在见任何候选结果之前冻结，第 8 周确定性基线已逐例跑通
+且可复现"。不宣称检索质量、不宣称 RAG 改善任务；保留集为自我封存
+（self-sealed ≠ independent blind test）；课程阈值不是行业标准或生产 SLO；
+确定性基线在受限类 agent 例输出 answered 属引擎语义缺口（第 11-12 周评测对象），
+不是评测集缺陷。
 

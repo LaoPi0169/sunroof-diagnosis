@@ -99,3 +99,32 @@ Week 09 变化点：
 - 语料层证据：`corpus-manifest-v1.json`（整体 sha256 `135f773cbd4aeb55…`，与全新重建逐字节一致）；
   两次独立构建清单逐字节相同；三档角色原始候选 support_agent 13 / supervisor 18 / 未知 0，
   受限内容零泄漏（详细证据见 `role-candidate-check-v1.md` 与 `ingestion-isolation-report-v1.md`）。
+
+## 5. 第 10 周 CI 证据（评测合同冻结 + 脱敏扩容 13 → 16 文件）
+
+最终验收运行（Run 1 一次通过，原始日志 `evidence/ci-run-w10.log`）：
+
+```
+CI RUN 2026-10-07T09:05:00+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 41 tests in 21.630s, exit=0  (OK = 35 + 评测合同 6)
+[PASS] STAGE-3-redaction :: scanned_files=16, emissions_checked=44, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=59402; smokes_passed=4/4
+CI RESULT OK
+```
+
+Week 10 变化点：
+
+- STAGE-2 全量测试 35 → 41（新增 `tests/test_eval_contract.py` 6 个评测合同用例：
+  60 行矩阵逐格精确（36/12/12 × 24/10/8/8/10）/ 输入 schema 与封存边界（输入行零标签字段）/
+  语料引用可解析（gold/forbidden 全部回到第 9 周快照清单）/ 近重复零跨 split 泄漏
+  （归一化 query 60/60 唯一）/ 封存标签 sha256 对齐冻结记录 / 确定性基线两次运行逐字节一致
+  （sealed 12 / not_applicable 20 / answered 24 / needs_review 4））。
+- STAGE-3 扫描范围 13 → 16 文件：评测工具链 `evaluation/eval_contract.py`、
+  `evaluation/validate_eval_set.py`、`evaluation/run_deterministic_baseline.py` 纳入运行时
+  输出脱敏扫描（扫描器清单同步扩容；44 个输出点零违规）。
+- 零模型调用声明：本周新增代码路径不含任何模型 API 调用；基线探针 100% 复用第 8 周
+  确定性政策引擎与第 9 周 ACL 候选 SQL（先过滤后候选语义不变）。
+- 评测层证据：冻结记录 `evaluation-freeze-record-v1.md` 登记 12 件冻结物 sha256，
+  程序化核对 12/12 一致（checked=12, bad=0）；保留集标签仅存封存件
+  （第 12 周 manifest 冻结后解封一次）；判题边界与开除线见 `eval-plan-v1.md` §5–6。
