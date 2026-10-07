@@ -36,6 +36,8 @@ SCOPE_FILES = [
     os.path.join("deploy", "smoke_w08.py"),
     os.path.join("ci", "redaction_scan.py"),
     os.path.join("ci", "run_local_ci.py"),
+    os.path.join("corpus", "build_corpus.py"),
+    os.path.join("corpus", "check_role_candidates.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)
