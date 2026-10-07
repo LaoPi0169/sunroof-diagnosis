@@ -1,0 +1,516 @@
+{
+  "corpus_snapshot": "northstar-corpus-w09-v1",
+  "batch_id": "corpus-batch-w09-v1",
+  "parser": {
+    "parser_id": "markdown-section-parser-v1",
+    "chunker_id": "fixed-heading-chunker-v1",
+    "chunker_params": {
+      "heading_level": 2,
+      "acl_inheritance": "chunk-strictest"
+    }
+  },
+  "routing_states": [
+    "accepted",
+    "accepted_restricted",
+    "expired",
+    "conflict_review",
+    "quarantined"
+  ],
+  "acl_model": {
+    "pushdown": "filter-then-candidate: 权限谓词下推到 SQL WHERE, 先过滤后候选",
+    "mixed_chunk_rule": "混合权限段取最严格权限 (段含主管标记 -> supervisor 专属), 不降权",
+    "leak_policy": "任何 supervisor 专属 chunk 出现在 support_agent 原始候选集 = 本周失败"
+  },
+  "counts": {
+    "documents_total": 8,
+    "chunks_total": 18,
+    "by_status": {
+      "accepted": 2,
+      "accepted_restricted": 1,
+      "expired": 1,
+      "conflict_review": 2,
+      "quarantined": 2
+    },
+    "chunks_by_classification": {
+      "internal-general": 13,
+      "internal-restricted": 5
+    }
+  },
+  "documents": [
+    {
+      "document_id": "billing-general-v1",
+      "file": "corpus/sources/billing-general-v1.md",
+      "title": "通用计费口径 v1（已废止）",
+      "lineage_key": "billing-general",
+      "source_version": "v1.0",
+      "source_owner": "费率组·赵倩",
+      "effective_at": "2025-01-01",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "expired",
+      "missing_fields": [],
+      "route_reason": "谱系取代: billing-general-v3 的 supersedes 包含本文件谱系键",
+      "content_sha256": "f7e5c6c5da3d8c8b1dbe558125d64b416eee75071278c044c499a36116f57075",
+      "content_bytes": 573,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "billing-general-v3",
+      "file": "corpus/sources/billing-general-v3.md",
+      "title": "通用计费口径 v3（对客解释基准）",
+      "lineage_key": "billing-general",
+      "source_version": "v3.2",
+      "source_owner": "费率组·赵倩",
+      "effective_at": "2026-01-01",
+      "expires_at": null,
+      "supersedes": [
+        "billing-general"
+      ],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted",
+      "missing_fields": [],
+      "route_reason": "合同字段齐备; 谱系现行; 无并行冲突来源",
+      "content_sha256": "89816599ee3c8de3a9095cd71db1c09c8f04a4ceb9359632ca63a90fb2dd5166",
+      "content_bytes": 2118,
+      "chunk_count": 8,
+      "chunk_ids": [
+        "billing-general-v3#s00",
+        "billing-general-v3#s01",
+        "billing-general-v3#s02",
+        "billing-general-v3#s03",
+        "billing-general-v3#s04",
+        "billing-general-v3#s05",
+        "billing-general-v3#s06",
+        "billing-general-v3#s07"
+      ]
+    },
+    {
+      "document_id": "price-difference-east-v5",
+      "file": "corpus/sources/price-difference-east-v5.md",
+      "title": "华东套餐差价细则 v5",
+      "lineage_key": "price-difference-east",
+      "source_version": "v5.0",
+      "source_owner": "费率组·赵倩",
+      "effective_at": "2026-03-01",
+      "expires_at": null,
+      "supersedes": [
+        "price-difference-east"
+      ],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted",
+      "missing_fields": [],
+      "route_reason": "合同字段齐备; 谱系现行; 无并行冲突来源",
+      "content_sha256": "58d5f78ccdebb307050d9b0411334f15be4812790c1de134dbd7f3b2eeed4d5f",
+      "content_bytes": 1220,
+      "chunk_count": 6,
+      "chunk_ids": [
+        "price-difference-east-v5#s00",
+        "price-difference-east-v5#s01",
+        "price-difference-east-v5#s02",
+        "price-difference-east-v5#s03",
+        "price-difference-east-v5#s04",
+        "price-difference-east-v5#s05"
+      ]
+    },
+    {
+      "document_id": "quick-note",
+      "file": "corpus/sources/quick-note.txt",
+      "title": "口头记录（无合同元数据）",
+      "lineage_key": null,
+      "source_version": null,
+      "source_owner": null,
+      "effective_at": null,
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": null,
+      "allowed_roles": [],
+      "status": "quarantined",
+      "missing_fields": [
+        "source_owner",
+        "allowed_roles",
+        "source_version",
+        "effective_at"
+      ],
+      "route_reason": "必填合同字段缺失 -> 默认隔离 (宁可不回答, 不冒答)",
+      "content_sha256": "6bd1fcb3e8cc811203280a6db46842071b4ce76f52e6a9ec1707f5848702f6ab",
+      "content_bytes": 180,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "refund-supervisor-v2",
+      "file": "corpus/sources/refund-supervisor-v2.md",
+      "title": "退款执行细则 v2（主管专属）",
+      "lineage_key": "refund-supervisor",
+      "source_version": "v2.1",
+      "source_owner": "退款组·孙敏",
+      "effective_at": "2026-02-01",
+      "expires_at": null,
+      "supersedes": [
+        "refund-supervisor"
+      ],
+      "conflict_group": null,
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted_restricted",
+      "missing_fields": [],
+      "route_reason": "合同字段齐备; 受限分类 (主管专属)",
+      "content_sha256": "74b00b36d7c2859392fde247caac71c1198653b45597e084e6750bfdc9d95580",
+      "content_bytes": 919,
+      "chunk_count": 4,
+      "chunk_ids": [
+        "refund-supervisor-v2#s00",
+        "refund-supervisor-v2#s01",
+        "refund-supervisor-v2#s02",
+        "refund-supervisor-v2#s03"
+      ]
+    },
+    {
+      "document_id": "special-refund-copy",
+      "file": "corpus/sources/special-refund-copy.md",
+      "title": "特殊退款政策（复制件，无合同元数据）",
+      "lineage_key": null,
+      "source_version": null,
+      "source_owner": null,
+      "effective_at": null,
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": "internal-restricted",
+      "allowed_roles": [],
+      "status": "quarantined",
+      "missing_fields": [
+        "source_owner",
+        "allowed_roles",
+        "source_version",
+        "effective_at"
+      ],
+      "route_reason": "必填合同字段缺失 -> 默认隔离 (宁可不回答, 不冒答)",
+      "content_sha256": "db992a4f0d367ed1098fdd368ec3f3a70ad707caef32d26af3281598616adf0c",
+      "content_bytes": 466,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "upgrade-east-v2",
+      "file": "corpus/sources/upgrade-east-v2.md",
+      "title": "华东套餐升级补偿口径 v2",
+      "lineage_key": "upgrade-east",
+      "source_version": "v2.0",
+      "source_owner": "渠道组·周锐",
+      "effective_at": "2026-04-01",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": "upgrade-east-2026-04",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "conflict_review",
+      "missing_fields": [],
+      "route_reason": "冲突组 upgrade-east-2026-04 存在并行现行来源: upgrade-notice-v4",
+      "content_sha256": "c081b207809f54dd681f714327570f73ee4d5f0f2e3961b4ef67cff30a8b9a0a",
+      "content_bytes": 494,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "upgrade-notice-v4",
+      "file": "corpus/sources/upgrade-notice-v4.md",
+      "title": "华东套餐升级通知 v4",
+      "lineage_key": "upgrade-notice",
+      "source_version": "v4.0",
+      "source_owner": "渠道组·周锐",
+      "effective_at": "2026-04-15",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": "upgrade-east-2026-04",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "conflict_review",
+      "missing_fields": [],
+      "route_reason": "冲突组 upgrade-east-2026-04 存在并行现行来源: upgrade-east-v2",
+      "content_sha256": "11c24f644c01d9ef6af687a415fb2375d6336e1c705fd81e05841970fc1131dc",
+      "content_bytes": 479,
+      "chunk_count": 0,
+      "chunk_ids": []
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "billing-general-v3#s00",
+      "document_id": "billing-general-v3",
+      "seq": 0,
+      "heading": "(导言)",
+      "chars": 118,
+      "text_sha256": "03e11d146d1a1bda99e7d825e84d71a7c4246184c77391decd6ceb5a74d75ade",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s01",
+      "document_id": "billing-general-v3",
+      "seq": 1,
+      "heading": "适用范围与生效说明",
+      "chars": 103,
+      "text_sha256": "8235fa87b7c34e75195676de3ed23d23f573cb543b82f5f235bcee3f18cb6b4f",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s02",
+      "document_id": "billing-general-v3",
+      "seq": 2,
+      "heading": "套餐月费与计费周期",
+      "chars": 98,
+      "text_sha256": "2df65976ef0a0af592810623f86b187ce1a3b05339c3021e35c7e1239b65f08a",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s03",
+      "document_id": "billing-general-v3",
+      "seq": 3,
+      "heading": "套餐差价的通用口径",
+      "chars": 113,
+      "text_sha256": "f2c039830fc9c7dcac244ea542226358be9628074cdb2ca7b499234158c65d53",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s04",
+      "document_id": "billing-general-v3",
+      "seq": 4,
+      "heading": "宽限期与滞纳金",
+      "chars": 85,
+      "text_sha256": "9029a1323a32224fcff679728e5726cf5e49b73b1479487184596cd8893a3302",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s05",
+      "document_id": "billing-general-v3",
+      "seq": 5,
+      "heading": "发票与凭证",
+      "chars": 71,
+      "text_sha256": "9c2352cbcb77353fa7da9a28f67285248de368d09c3b44aadc07c758a467ad58",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s06",
+      "document_id": "billing-general-v3",
+      "seq": 6,
+      "heading": "主管例外条款（仅限主管处理）",
+      "chars": 98,
+      "text_sha256": "175c35179834eddee7616f4af64de0a36ccbf9d602609360f03085a96db9317e",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "billing-general-v3#s07",
+      "document_id": "billing-general-v3",
+      "seq": 7,
+      "heading": "投诉与升级路径",
+      "chars": 92,
+      "text_sha256": "5778664b0831f2bfdcbacb6ef881d0e9b2e29e680ace2eea24f288f1ec90c44f",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s00",
+      "document_id": "price-difference-east-v5",
+      "seq": 0,
+      "heading": "(导言)",
+      "chars": 95,
+      "text_sha256": "1e1a2a98a4095cb4a920b988efcd0de70659dd546a4319085864b1969bf9e3bd",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s01",
+      "document_id": "price-difference-east-v5",
+      "seq": 1,
+      "heading": "差价适用条件",
+      "chars": 78,
+      "text_sha256": "fa9be5b89d758ae5fe5e8ca19fd8054c5b67a817276385033b8a62912867d84d",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s02",
+      "document_id": "price-difference-east-v5",
+      "seq": 2,
+      "heading": "差价计算公式",
+      "chars": 72,
+      "text_sha256": "b9208bedefd1fa1d6787157d6fdfd612b80070e05be1c943c9f3546ef6a43725",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s03",
+      "document_id": "price-difference-east-v5",
+      "seq": 3,
+      "heading": "折算与进位规则",
+      "chars": 60,
+      "text_sha256": "bc16571ea41f669a20b97554cd0b7d21945070f0c203edd653b89caf6d174fb4",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s04",
+      "document_id": "price-difference-east-v5",
+      "seq": 4,
+      "heading": "与通用口径的关系",
+      "chars": 82,
+      "text_sha256": "1d147b66c2d2f8db36c148d4f1868419dfdd1fa6cf924b0bd9efcb6d4e2647be",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "price-difference-east-v5#s05",
+      "document_id": "price-difference-east-v5",
+      "seq": 5,
+      "heading": "常见问答口径",
+      "chars": 67,
+      "text_sha256": "4cab6f4b2e9b8271b553984822e8e9e9ee2473c3317f2d45333b524f77a4a234",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "support_agent",
+        "supervisor"
+      ],
+      "status": "accepted"
+    },
+    {
+      "chunk_id": "refund-supervisor-v2#s00",
+      "document_id": "refund-supervisor-v2",
+      "seq": 0,
+      "heading": "(导言)",
+      "chars": 91,
+      "text_sha256": "c8200485a17ee6f8080d04e8422d1793b86822abd78ae107501b179386bc3899",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted_restricted"
+    },
+    {
+      "chunk_id": "refund-supervisor-v2#s01",
+      "document_id": "refund-supervisor-v2",
+      "seq": 1,
+      "heading": "全额退款审批线",
+      "chars": 81,
+      "text_sha256": "fdfd55d26133aed5917b52455766e61829cbc705444a347f2dde8b8e5a724592",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted_restricted"
+    },
+    {
+      "chunk_id": "refund-supervisor-v2#s02",
+      "document_id": "refund-supervisor-v2",
+      "seq": 2,
+      "heading": "特殊情形的退款执行",
+      "chars": 76,
+      "text_sha256": "f426ba823f1051de478959b182bdca2811868cf13ce53a06ae2cc3e3e1d9461c",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted_restricted"
+    },
+    {
+      "chunk_id": "refund-supervisor-v2#s03",
+      "document_id": "refund-supervisor-v2",
+      "seq": 3,
+      "heading": "退款凭证的核验要求",
+      "chars": 77,
+      "text_sha256": "675ea3f746637cea2a6ae28f40923a152915b3552e81782526a4fc9fbc50e0a1",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "supervisor"
+      ],
+      "status": "accepted_restricted"
+    }
+  ],
+  "determinism": {
+    "no_wall_clock": "清单不含摄取墙钟时间, 血缘以 batch_id 为锚",
+    "rebuild_check": "两次构建 (不同临时库) 的 documents/chunks 全字段逐条一致"
+  }
+}

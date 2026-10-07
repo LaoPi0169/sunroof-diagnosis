@@ -297,7 +297,7 @@ fde-course-week-05/
 
 ```powershell
 # 全量自动化测试（Week 05 基线 5 + Week 06 摄取 8 + Week 07 任务 7 + Week 08 部署 9）
-python -m unittest discover -s tests -v          # 预期 Ran 29 tests ... OK
+python -m unittest discover -s tests -v          # 预期 Ran 29 tests ... OK（第 8 周时点；第 9 周起全量 35，见下文 Week 09）
 
 # 本地 CI 四阶段（schema / 全量测试 / 脱敏扫描 / 干净环境任务冒烟）
 python ci/run_local_ci.py                        # 预期 4/4 阶段 PASS，退出码 0
@@ -311,4 +311,65 @@ python ci/run_local_ci.py                        # 预期 4/4 阶段 PASS，退�
 回滚对象是配置数据而非代码（不含 DDL 回退）；冒烟要求全新初始化数据库（一次性前置）；全部演练在单机
 沙盒完成，不声称生产就绪、热回滚或组织级 ROI；配置内容正确性靠人工评审 + 任务冒烟门双防线，收敛器不判对错。
 
+
+# Week 09 —— 有来源、有版本、有权限的 RAG 语料（语料治理，零模型调用）
+
+依据 `specs/mission-week-09.md`：在冻结的 `week08-baseline` 之上，把八份北辰合成知识材料治理成
+**可重复构建、权限受控的语料快照**。本周全程零模型调用——不做 embedding、不调检索、不生成回答、
+不写提示词；只证明"语料可被治理"，不外推"RAG 改善任务"。
+
+## 第 9 周新增结构
+
+```
+fde-course-week-05/
+├─ corpus/
+│  ├─ build_corpus.py                  # 确定性语料构建器（五态路由 + fixed-heading-chunker-v1）
+│  ├─ check_role_candidates.py         # 角色候选核查（ACL 下推到 SQL WHERE，先过滤后候选）
+│  ├─ corpus_schema.sql                # 语料两表 schema（独立于冻结迁移清单，见下）
+│  └─ sources/                         # 8 份合成知识来源（逐份 sha256 绑定进清单）
+├─ corpus-manifest-v1.json             # 交付物：语料快照清单（8 文档 / 18 chunks，确定性无墙钟）
+├─ option-note-v1.md                   # 交付物：RAG 准入与四条路径比较
+├─ knowledge-owner-acl-matrix-v1.md    # 交付物：来源-责任矩阵 + 8 份文档级治理合同 + 角色映射
+├─ ingestion-isolation-report-v1.md    # 交付物：状态路由证据 + 两次构建逐字节比对
+├─ role-candidate-check-v1.md          # 交付物：模型调用前三档角色原始候选检查（0 泄漏）
+├─ corpus-card-v1.md                   # 交付物：语料卡片
+├─ source-review-note-v1.md            # 交付物：知识所有者回读记录（模拟）
+└─ tests/test_corpus_governance.py     # 6 个语料治理用例（全量 35/35）
+```
+
+## 五态路由与权限下推
+
+- 路由状态机：缺所有者/ACL/版本/生效期任一要件 → `quarantined`（默认隔离）；
+  被谱系取代 → `expired`（与文件时间戳无关）；并行冲突 → `conflict_review`（保留供第 10–12 周
+  识别冲突）；其余 → `accepted` / `accepted_restricted`（仅主管）。
+  实测：8 份 → 2 accepted / 1 accepted_restricted / 1 expired / 2 conflict_review / 2 quarantined。
+- chunk 原子继承文档身份与 ACL；混合权限段取**最严格权限**（实测案例
+  `billing-general-v3#s06` 主管例外段）。
+- 候选 SQL 把 ACL 谓词下推到 `WHERE`（`json_each(allowed_roles)`）：**先过滤后候选**，
+  不允许"先全库召回再过滤"。实测：support_agent 13 / supervisor 18 / 未知角色 0，
+  受限内容在 agent 候选中零出现（`corpus/check_role_candidates.py` 退出码门禁）。
+
+## 第 9 周验证方式
+
+```powershell
+# 构建语料快照（两次构建清单逐字节一致；仓库根 corpus-manifest-v1.json 与全新重建一致）
+python corpus/build_corpus.py --db data\corpus-w09.db --manifest corpus-manifest-v1.json
+
+# 三档角色原始候选检查（agent 13 / supervisor 18 / unknown 0；泄漏时退出码 1）
+python corpus/check_role_candidates.py --db data\corpus-w09.db
+
+# 全量自动化测试（Week 05 基线 5 + Week 06 摄取 8 + Week 07 任务 7 + Week 08 部署 9 + Week 09 语料 6）
+python -m unittest discover -s tests -v          # 预期 Ran 35 tests ... OK
+```
+
+冻结面说明：语料两表 schema 独立存放于 `corpus/corpus_schema.sql`，不进入
+`application/database.py::MIGRATION_SCRIPTS` 冻结清单 —— `release-manifest-v1.json`
+（schema_version=003）与 `week08-baseline` 的绑定语义不变；语料库由构建器在 `init_db()`
+底座（001–003）之上叠加执行，同一库同时承载冻结面与语料面。
+
+## 第 9 周交付边界（诚实不夸大）
+
+本周只证明"语料可被治理成权限受控、可重复构建的快照"：不宣称检索质量、不宣称 RAG 改善任务
+（留给第 10–12 周冻结评测合同）；材料为教学合成（synthetic=true），无真实客户正文；
+冲突对（upgrade-east-v2 vs upgrade-notice-v4）在所有者裁决前不得作为任何答案依据。
 

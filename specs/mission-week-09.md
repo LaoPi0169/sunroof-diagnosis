@@ -35,7 +35,7 @@
      `accepted_restricted`（仅主管可见）。冲突材料可留在快照中供以后测试，但不得标成"可靠且唯一
      的当前答案"。
    * 复用第 6 周数据入口的血缘与隔离机制（幂等摄取、批内去重、`batch_id`/`source_version`/
-     `owner_id` 列），新增语料文档表与分块表（迁移 004），固定解析器与分块规则版本
+     `owner_id` 列），新增语料文档表与分块表（语料子系统自有 schema，见文末工程落地记录），固定解析器与分块规则版本
      （如 `fixed-heading-chunker-v1`）。**chunk 必须原子继承文档的身份与限制**；混合普通条款与
      主管条款的 chunk 取最严格权限，或回到来源边界重新切分。
 4. **在任何模型调用前做角色候选检查（Role Candidate Check）**：
@@ -68,7 +68,8 @@
     `knowledge-owner-acl-matrix-v1.md`，并把手册角色口径（`support-agent`/`support-supervisor`）
     映射到仓库现有会话角色（`support_agent`/`supervisor`）。
 * **第 3 天：复用已有数据入口，产生确定性文档与 chunk manifest（2 小时）**
-  * 迁移 004 新增 `corpus_documents` / `corpus_chunks`（沿用第 6 周血缘列风格）；固定解析器与
+  * 新增 `corpus_documents` / `corpus_chunks`（语料子系统自有 schema，沿用第 6 周血缘列风格）；
+    固定解析器与
     分块规则版本；生成 `corpus-manifest-v1.json` 与快照摘要（文档数、chunk 数、各状态计数、
     快照 ID 如 `northstar-corpus-w09-v1`）。
 * **第 4 天：重复构建比对 + 三档角色原始候选检查（2 小时）**
@@ -95,7 +96,8 @@ fde-course-week-05/
 ```
 
 配套工程产物（沿用第 6/8 周惯例，纳入 CI 与自动化测试，不改变冻结基线的确定性面）：
-`migrations/004_corpus_schema.sql`（语料两表，幂等迁移）、`corpus/build_corpus.py`
+`corpus/corpus_schema.sql`（语料两表，独立于冻结迁移清单的幂等 schema，见文末工程落地记录）、
+`corpus/build_corpus.py`
 （确定性摄取与分块，固定规则版本）、`corpus/check_role_candidates.py`（三档角色原始候选检查）、
 `tests/test_corpus_governance.py`（快照确定性 / 角色候选零泄漏 / 缺要件默认隔离），
 以及 README 第 9 周章节与本地 CI 阶段挂载。
@@ -214,15 +216,15 @@ fde-course/
   "snapshot_id": "northstar-corpus-w09-v1",
   "built_from_code_revision": "week08-baseline",
   "corpus_contract_version": "knowledge-owner-acl-matrix-v1",
-  "parser_version": "teaching-parser-v1",
+  "parser_version": "markdown-section-parser-v1",
   "chunker_version": "fixed-heading-chunker-v1",
-  "built_at": "2026-10-07T00:00:00+08:00",
+  "batch_id": "corpus-batch-w09-v1",
   "synthetic": true,
   "documents": [
     {
       "document_id": "billing-general-v3",
-      "source_uri": "teaching://northstar/policies/billing-general-v3",
-      "source_owner": "billing-policy-owner",
+      "source_uri": "corpus/sources/billing-general-v3.md",
+      "source_owner": "费率组·赵倩",
       "content_hash": "<sha256-of-source-text>",
       "version": "3",
       "effective_at": "2026-08-01T00:00:00+08:00",
@@ -231,7 +233,7 @@ fde-course/
       "classification": "internal-general",
       "allowed_roles": ["support_agent", "supervisor"],
       "status": "accepted",
-      "chunk_count": 6
+      "chunk_count": 8
     },
     {
       "document_id": "refund-supervisor-v2",
@@ -239,10 +241,10 @@ fde-course/
       "classification": "internal-restricted",
       "allowed_roles": ["supervisor"],
       "status": "accepted_restricted",
-      "chunk_count": 3
+      "chunk_count": 4
     },
     { "document_id": "billing-general-v1", "status": "expired", "superseded_by": "billing-general-v3", "chunk_count": 0 },
-    { "document_id": "price-difference-east-v5", "status": "accepted", "allowed_roles": ["support_agent", "supervisor"], "chunk_count": 4 },
+    { "document_id": "price-difference-east-v5", "status": "accepted", "allowed_roles": ["support_agent", "supervisor"], "chunk_count": 6 },
     { "document_id": "upgrade-east-v2", "status": "conflict_review", "conflict_with": "upgrade-notice-v4", "chunk_count": 0 },
     { "document_id": "upgrade-notice-v4", "status": "conflict_review", "conflict_with": "upgrade-east-v2", "chunk_count": 0 },
     { "document_id": "quick-note.txt", "status": "quarantined", "missing": ["owner", "acl", "version", "effective_period"], "chunk_count": 0 },
@@ -259,7 +261,7 @@ fde-course/
 
 ```json
 {
-  "chunk_id": "billing-general-v3#section-04",
+  "chunk_id": "billing-general-v3#s06",
   "document_id": "billing-general-v3",
   "text_digest": "<sha256>",
   "version": "3",
@@ -278,16 +280,17 @@ fde-course/
 
 - **快照**: northstar-corpus-w09-v1（builder: corpus/build_corpus.py，规则版本 fixed-heading-chunker-v1）
 - **数据入口**: 复用第 6 周幂等摄取机制（批内去重 + 查重 + 主键兜底 → 隔离区），血缘列沿用
-  `source_version` / `owner_id` / `batch_id`；语料表为迁移 004 新增，不触碰 policies 冻结面
+  `source_version` / `owner_id` / `batch_id`；语料两表为语料子系统自有 schema
+  （`corpus/corpus_schema.sql`，独立于冻结迁移清单，见文末工程落地记录），不触碰 policies 冻结面
 
 ## 1. 状态路由结果（batch: corpus-w09-batch-01）
 
 | 文档 ID | 状态 | 摄取动作 | 隔离/标记理由 |
 | --- | --- | --- | --- |
-| billing-general-v3 | accepted | 入库 + 6 chunks | — |
-| refund-supervisor-v2 | accepted_restricted | 入库 + 3 chunks（restricted） | — |
+| billing-general-v3 | accepted | 入库 + 8 chunks（7 普通 + 1 受限段 s06） | — |
+| refund-supervisor-v2 | accepted_restricted | 入库 + 4 chunks（restricted） | — |
 | billing-general-v1 | expired | 入库（0 chunks，不参与候选） | superseded_by=billing-general-v3 |
-| price-difference-east-v5 | accepted | 入库 + 4 chunks | — |
+| price-difference-east-v5 | accepted | 入库 + 6 chunks | — |
 | upgrade-east-v2 / upgrade-notice-v4 | conflict_review | 入库（0 chunks） | 冲突对保留在快照供第 10–12 周测试识别，不得作为可靠唯一答案 |
 | quick-note.txt | quarantined | 隔离区 | 缺 owner/ACL/版本/有效期 |
 | special-refund-copy.md | quarantined | 隔离区 | ACL 丢失 + 来源边界不明（正文疑似主管条款） |
@@ -378,6 +381,20 @@ fde-course/
 ```
 
 ---
+
+---
+
+## 本周工程落地记录（实构建对参考模板的修正，如实记录）
+
+1. **schema 归属**: 语料两表不走 `application/database.py::MIGRATION_SCRIPTS` —— 该清单与
+   `release-manifest-v1.json`（schema_version=003）及 week08 冻结测试绑定；语料 schema 独立存放于
+   `corpus/corpus_schema.sql`，由 `corpus/build_corpus.py` 在 `init_db()` 冻结底座（001–003）之上
+   叠加执行，同一库同时承载冻结面与语料面，冻结面零改动。
+2. **清单去墙钟**: 清单不含 `built_at` 类字段（两次构建须逐字节一致），血缘以 `batch_id` 为锚。
+3. **chunk 计数实况**: billing-general-v3 = 8（7 普通 + 1 受限段）、refund-supervisor-v2 = 4、
+   price-difference-east-v5 = 6，合计 18（13 普通 + 5 受限）；agent 候选 13 / supervisor 18 /
+   未知 0。首发现实偏差：主管例外段标记位于**段标题**，chunker 首轮只扫描正文导致 s06 漏收紧
+   （agent 候选一度为 14），修正为"标题 + 正文"后复测通过，并在治理测试中固化精确候选集合断言。
 
 > **第 9 周在 24 周路线中的位置**：第 9 周（语料治理）→ 第 10 周（冻结评测合同 + 60 条案例）
 > → 第 11 周（检索比较）→ 第 12 周（有引用、会拒答的只读 RAG 评测）。

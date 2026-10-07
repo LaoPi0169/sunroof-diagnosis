@@ -1,0 +1,10 @@
+CI RUN 2026-10-07T07:33:20+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 35 tests in 7.651s, exit=0
+Ran 35 tests in 7.651s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=13, emissions_checked=42, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=64497; smokes_passed=4/4
+CI RESULT OK | duration=11.4s | 2026-10-07T07:33:31+00:00 (UTC)
+

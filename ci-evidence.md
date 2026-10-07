@@ -73,3 +73,29 @@ CI RESULT OK
 - 本地 CI 流水线 4/4 阶段通过，退出码 0；干净环境真实部署 + 任务冒烟在 Run 1 即一次通过（4/4）。
 - 脱敏扫描在两轮运行中分别捕获自指问题与真实违规，证明扫描规则真实生效而非摆设。
 - 原始证据（含失败轮次）完整保留于 `evidence/ci-run-w08.log`，不删失败记录 —— 失败-修复链本身就是证据。
+
+## 四、Week 09 运行记录（RAG 语料治理，回链 specs/mission-week-09.md）
+
+最终验收运行（Run 1 一次通过，原始日志 `evidence/ci-run-w09.log`）：
+
+```
+CI RUN 2026-10-07T07:33:20+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 35 tests in 7.651s, exit=0  (OK = 29 + 语料治理 6)
+[PASS] STAGE-3-redaction :: scanned_files=13, emissions_checked=42, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=64497; smokes_passed=4/4
+CI RESULT OK | duration=11.4s
+```
+
+Week 09 变化点：
+
+- STAGE-2 全量测试 29 → 35（新增 `tests/test_corpus_governance.py` 6 个语料治理用例：
+  两次构建确定性 / 缺要件默认隔离 / supersedes 谱系过期 / 冲突对保留 / 角色候选零泄漏
+  （精确候选集合断言，含 `billing-general-v3#s06` 排除）/ 清单绑定全新重建）。
+- STAGE-3 扫描范围 11 → 13 文件：语料工具链 `corpus/build_corpus.py`、
+  `corpus/check_role_candidates.py` 纳入运行时输出脱敏扫描。
+- STAGE-1 冻结面不变：`migrations=3`（语料两表 schema 独立存放于 `corpus/corpus_schema.sql`，
+  不触碰 `release-manifest-v1.json` 的 schema_version=003 绑定语义）。
+- 语料层证据：`corpus-manifest-v1.json`（整体 sha256 `135f773cbd4aeb55…`，与全新重建逐字节一致）；
+  两次独立构建清单逐字节相同；三档角色原始候选 support_agent 13 / supervisor 18 / 未知 0，
+  受限内容零泄漏（详细证据见 `role-candidate-check-v1.md` 与 `ingestion-isolation-report-v1.md`）。
