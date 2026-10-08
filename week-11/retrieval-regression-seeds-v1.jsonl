@@ -1,0 +1,12 @@
+{"seed_id": "SR-01", "case_id": "NS-DEV-03", "retriever": "keyword", "required_gold_document_ids": ["billing-general-v3"], "max_rank": 1, "rationale": "可回答例 gold 第 1（BM25 22.16），锁定主管例关键词主路径"}
+{"seed_id": "SR-02", "case_id": "NS-DEV-05", "retriever": "keyword", "required_gold_document_ids": ["price-difference-east-v5"], "max_rank": 1, "rationale": "差价类 agent 例 gold 第 1，锁定专用文档压过通用文档"}
+{"seed_id": "SR-03", "case_id": "NS-DEV-12", "retriever": "keyword", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 1, "rationale": "受限 supervisor 对照组 gold 第 1，锁定受限文档可达性"}
+{"seed_id": "SR-04", "case_id": "NS-DEV-35", "retriever": "keyword", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 1, "rationale": "受限对照组第二例 gold 第 1（BM25 31.29），防受限文档排名回退"}
+{"seed_id": "SR-05", "case_id": "NS-CAL-01", "retriever": "keyword", "required_gold_document_ids": ["billing-general-v3"], "max_rank": 1, "rationale": "校准集可回答例 gold 第 1，校准行为回归锚"}
+{"seed_id": "SR-06", "case_id": "NS-DEV-01", "retriever": "keyword", "required_gold_document_ids": ["billing-general-v3"], "max_rank": 2, "rationale": "边界监控：专用文档居首时通用 gold 不得跌出第 2（当前 18.96 vs 15.60 挤占）"}
+{"seed_id": "SR-07", "case_id": "NS-DEV-01", "retriever": "vector", "required_gold_document_ids": ["billing-general-v3"], "max_rank": 1, "rationale": "可回答例 vector gold 第 1（0.453），锁定向量主路径"}
+{"seed_id": "SR-08", "case_id": "NS-DEV-19", "retriever": "vector", "required_gold_document_ids": ["price-difference-east-v5"], "max_rank": 1, "rationale": "专用文档 vector 第 1（0.371），与 keyword 行为相反的回归锚"}
+{"seed_id": "SR-09", "case_id": "NS-DEV-12", "retriever": "vector", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 1, "rationale": "受限对照组 vector gold 第 1（0.391）"}
+{"seed_id": "SR-10", "case_id": "NS-DEV-35", "retriever": "vector", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 1, "rationale": "受限对照组第二例 vector gold 第 1（0.392）"}
+{"seed_id": "SR-11", "case_id": "NS-DEV-36", "retriever": "vector", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 1, "rationale": "vector 对受限文档排第 1 而 keyword 第 2 的差异锚（0.423）"}
+{"seed_id": "SR-12", "case_id": "NS-CAL-12", "retriever": "vector", "required_gold_document_ids": ["refund-supervisor-v2"], "max_rank": 2, "rationale": "边界监控：校准受限例当前第 2（0.356），不得再退"}

@@ -1,0 +1,58 @@
+{
+  "comparison_id": "northstar-retrieval-comparison-w11-v1",
+  "frozen_at": "2026-10-07",
+  "decision_supported": "eval-plan-v1.md §1: RAG 候选是否值得进入第 12 周 (本清单只产出检索层输入, 不生成答案)",
+  "corpus": {
+    "snapshot": "northstar-corpus-w09-v1",
+    "manifest_sha256": "41d127ed0785df040afd0ba801a7bc5c08f88cd4c6baedad2cd526bf4a67cda1",
+    "chunker": "fixed-heading-chunker-v1",
+    "acl_policy": "corpus/check_role_candidates.py::candidates_for (week09-baseline, SQL WHERE 内 json_each 权限谓词)",
+    "acl_semantics": "先过滤后候选: 仅角色允许池内打分排序, 被排除 chunk 不进入任何打分路径",
+    "pool_note": "accepted 2 文档 14 chunks + accepted_restricted 1 文档 4 chunks; agent 池 13 (billing-general-v3#s06 混合权限段仅主管); 冲突对与过期文档 0 chunks (第 9 周五态路由冻结在候选池外, 属语料层设计)"
+  },
+  "dataset": {
+    "version": "northstar-eval-w10-v1",
+    "eval_set_sha256": "861116958aa920e11ead1d91fd563c548f69af662be71e3e72004c73b6c817a5",
+    "splits_executed": ["development", "calibration"],
+    "executed_cases": 48,
+    "holdout": "not_executed (12 条标签封存于 eval-holdout-labels-sealed-v1.json, 第 12 周候选系统 manifest 冻结后解封一次)"
+  },
+  "labels": {
+    "source": "labeling-guide-v1.md 附录 (开发/校准 48 条公开标签, 只读解析)",
+    "sha256": "60beaa1b56b1185f0ca9e92e97313e1db9b779a90f4d649831c7ee59e2d0010a",
+    "sealed_labels_used": false
+  },
+  "retrievers": {
+    "keyword": {
+      "id": "keyword-bm25-local-v1",
+      "impl": "retrieval/contract.py::BM25Index (Python 标准库; 本机 SQLite 无 FTS5)",
+      "params": {"k1": 1.5, "b": 0.75, "tokenizer": "cjk-unigram+bigram+ascii-word", "pool": "role-allowed chunks only", "tie_break": "(-score, chunk_id)"}
+    },
+    "vector": {
+      "id": "vector-hashed-ngram-v1",
+      "impl": "retrieval/contract.py::VectorIndex (Python 标准库, 确定性哈希, 无随机性)",
+      "params": {"dim": 512, "hash": "blake2b(digest_size=8) mod dim", "tokenizer": "同 keyword", "weighting": "tf + L2 归一化, 余弦相似度", "tie_break": "(-score, chunk_id)"},
+      "honesty_note": "教学用本地确定性向量化替身 (验证比较协议本身); 不宣称生产级语义检索质量, 不代表真实 embedding 服务表现"
+    }
+  },
+  "protocol": {
+    "top_k": 5,
+    "score_comparability": "BM25 与余弦分数量纲不同, 禁止跨检索器比较 score; 只比较 gold 命中/排名/失败层",
+    "latency": "逐例记录 latency_ms (遥测); 确定性断言比较排除 latency_ms 的规范投影 (sort_keys)",
+    "cost": "本地确定性实现, 逐例 cost_estimate_usd=0.0 (如实记录, 非生产成本口径)",
+    "change_budget": "开发集诊断后至多一次受控修改 (只改一个变量); 冻结后校准集只跑一次",
+    "metrics": {
+      "primary": "per-case Recall@5 = |gold ∩ top5| / |gold|; 汇总 micro/macro, 分母 = gold 非空且 gold ⊆ 角色允许池的适用例",
+      "denominator_note": "语料外类无 gold; 冲突/过期族 gold 被语料层冻结在候选池外 (0 chunks) 不计入分母, 如实按切片报告; supervisor 受限对照组计入分母",
+      "secondary": ["Hit@5 (全 gold 进 top5 的例占比)", "per-family 切片", "restricted_candidate_count", "latency_ms"]
+    }
+  },
+  "gates": {
+    "eval_plan_layer2": "gold 进入候选比例 >= 0.7 才进第 12 周 (eval-plan-v1.md §5 第 2 层)",
+    "hard_gates": [
+      "support_agent 原始候选中受限 chunk 观测数 = 0 (已声明身份样本, 注明边界)",
+      "保留集未运行; 冻结件 (第 10 周 12 件 sha256) 未改动",
+      "被召回不等于答案正确: 过期/冲突来源被召回不记为检索成功"
+    ]
+  }
+}
