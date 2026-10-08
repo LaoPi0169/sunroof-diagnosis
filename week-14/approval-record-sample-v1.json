@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "artifact": "approval-record-sample-v1",
+    "exported_from": "python -m mcptool.demo_write_approval (固定时钟 2026-10-08T00:00:00Z, 实际运行导出)",
+    "run_id": "run-w14-001",
+    "record_version": "approval-record-v1",
+    "restricted": "本文件属受限审计面 (含批准载荷); 不得进入普通日志; 引用须标注 restricted",
+    "note": "手册完成例 approval-021-1 (run-021, POL-17@v3/POL-22@v2, expires 2026-08-25) 为北辰示例; 本样例为本仓库教学实现的实际记录, 值来自自有冻结语料冲突组, schema 与手册同构"
+  },
+  "denied_decision_record": {
+    "record_version": "approval-record-v1",
+    "approval_id": "denial-w14-001-1",
+    "decision": "denied",
+    "requester": "user-zhou-ning",
+    "tenant_id": "northstar-training",
+    "run_id": "run-w14-001",
+    "proposed_parameters": {
+      "case_id": "NS-1042",
+      "reason_code": "POLICY_CONFLICT",
+      "source_refs": ["upgrade-east-v2", "upgrade-notice-v4"],
+      "target_queue": "billing-supervisor-review"
+    },
+    "decided_at": "2026-10-08T00:00:00Z",
+    "_note": "用户第一次在确认界面拒绝: 正常安全终态, 不可执行不可复用, 编排器未自动重问"
+  },
+  "approved_approval_record": {
+    "record_version": "approval-record-v1",
+    "approval_id": "approval-w14-001-1",
+    "decision": "approved",
+    "requester": "user-zhou-ning",
+    "tenant_id": "northstar-training",
+    "run_id": "run-w14-001",
+    "tool": "ticket.create",
+    "tool_version": "1",
+    "approved_parameters": {
+      "case_id": "NS-1042",
+      "reason_code": "POLICY_CONFLICT",
+      "source_refs": ["upgrade-east-v2", "upgrade-notice-v4"],
+      "target_queue": "billing-supervisor-review"
+    },
+    "resource_scope": "case:NS-1042",
+    "policy_version": "ticket-create-policy-v1",
+    "maximum_uses": 1,
+    "uses": 0,
+    "issued_at": "2026-10-08T00:00:00Z",
+    "expires_at": "2026-10-08T00:15:00Z",
+    "_note": "用户第二次确认后的逐次审批: 绑定身份/运行/工具版本/完整规范化参数/范围/策略/次数/有效期; uses 在执行成功后为 1 (用尽)"
+  }
+}

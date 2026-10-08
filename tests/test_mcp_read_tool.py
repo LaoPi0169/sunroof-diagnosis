@@ -166,12 +166,13 @@ class McpReadToolTest(unittest.TestCase):
         for result in results:
             self.assertTrue(result["pass"], result["fixture_id"])
             self.assertEqual(result["external_write_effects"], 0)
-        # 设计级断言: 服务端/案例库模块不存在任何写入口
-        for module in (server_mod, case_store):
-            for name in dir(module):
-                if callable(getattr(module, name, None)):
-                    for verb in ("write", "create", "update", "delete", "mutate"):
-                        self.assertNotIn(verb, name)
+        # 设计级断言: 案例库模块不存在任何写入口 (第 14 周起 server 模块合法
+        # 拥有带审批门的写入口 preview_create/create/get_ticket, 不在本断言范围;
+        # 写路径的效果硬门由 tests/test_mcp_write_tool.py 独立覆盖)
+        for name in dir(case_store):
+            if callable(getattr(case_store, name, None)):
+                for verb in ("write", "create", "update", "delete", "mutate"):
+                    self.assertNotIn(verb, name)
 
     # ---- 09 13 种子工具在环回归 ----
     def test_09_seed_regression_tool_in_loop(self):
