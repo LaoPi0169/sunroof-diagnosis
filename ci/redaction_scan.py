@@ -44,6 +44,9 @@ SCOPE_FILES = [
     os.path.join("retrieval", "contract.py"),
     os.path.join("retrieval", "labels.py"),
     os.path.join("retrieval", "run_retrieval_comparison.py"),
+    os.path.join("generation", "contract.py"),
+    os.path.join("generation", "evaluate.py"),
+    os.path.join("generation", "run_rag_evaluation.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

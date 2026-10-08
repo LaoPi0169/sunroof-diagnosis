@@ -453,4 +453,53 @@ Recall@5 双检索器 1.0（≥0.7 晋级门达标）——但这是 13/18-chunk
 冲突对与过期文档 0 chunk 被语料层冻结在候选池外（第 9 周设计），检索层不可见也不可修；
 vector 为教学替身（blake2b 哈希），不宣称生产级语义检索质量；被召回 ≠ 答案正确。
 
+## 第 12 周：只读 RAG 评测（三态回答合同 + 确定性生成替身 + 一次解封）
+
+把第 11 周晋级的 `vector-hashed-ngram-v1` 接到只读回答层：对 60 条考卷产出
+**answered / abstained / escalate** 三态 + 精确引用 + `reason_code`/`user_next_step`，
+引用验证是确定性代码检查（非模型自评）。生成层如实标注为**确定性教学替身**
+（本机无模型 API：允许池命中 chunk 的抽取式组装，不改写不补写；模型输出零业务效果）。
+门控全部确定性、阈值/词表/映射预注册于 manifest（先冻结后解封）；路由只用
+query+role+语料状态元数据，**显式弃用 task_context.category**（意图标签捷径）。
+
+```
+week-12/rag-system-manifest-v1.json            # 系统清单（阈值/门控/词表/映射/事实规则 预注册，输入 sha256 绑定）
+week-12/rag-per-case-results-v1.jsonl          # 60 例逐例结果（一次解封运行落盘，存在即拒绝重写）
+week-12/rag-evaluation-report-v1.md            # 七层指标 + 保留集结果 + 失败归因 + 边界
+week-12/failure-register-v1.jsonl              # 8 层失败登记（corpus/ACL/retrieval/ranking-context/generation/citation/refusal/product-workflow）
+week-12/regression-seeds-v1.jsonl              # 回归种子（行为锁定）
+week-12/field-review-note-v1.md                # 一线走查记录（只读演示）
+week-12/brief-review-week-12.md                # 导师评审简报
+week-12/decision-memo-03.md                    # 五选一收官裁定
+generation/contract.py                         # 三态回答合同 + 门控决策树 + 抽取式组装
+generation/evaluate.py                         # 期望状态映射 + 事实校验规则 + 七层指标
+generation/run_rag_evaluation.py               # 评测运行器（unseal-once 守卫 + 双跑确定性断言）
+tests/test_rag_generation.py                   # 9 个 RAG 合同用例（全量 47 -> 56）
+```
+
+### 第 12 周验证方式
+
+```powershell
+# dev+cal 预演（保留集不解封；结果写临时目录）
+python generation\run_rag_evaluation.py --splits dev,cal --out-dir <临时目录>
+
+# 全量解封运行（须 manifest 已冻结 + 显式 --unseal-holdout；只允许一次）
+python generation\run_rag_evaluation.py --splits all --unseal-holdout
+
+# RAG 合同测试（manifest 冻结门 / 三态 schema / ACL 零泄漏 / 状态门回归 / 确定性 / 引用支持 / 指标对账 / 解封机制）
+python -m unittest tests.test_rag_generation -v
+```
+
+### 第 12 周结果要点与边界（诚实不夸大）
+
+dev+cal 48 例端到端状态匹配 48/48（L5=1.0，冻结分母），引用支持 30/30、受限零泄漏、
+L3 答案保真 5/6=0.833（≥0.8）。**保留集 12 例 10 对，出现 1 例硬门失败**：
+NS-HOLD-06（supervisor 语料外问句）池内 top-1 以 0.311 越过 0.30 作答线自信作答
+（L4=9/10<100%），归因 generation/refusal 层；NS-HOLD-08 冲突雷达意图支配失败
+（安全侧拒答，状态档位错）。**结果未用于调参**；失败全部登记进 8 层失败登记，
+修复留给 manifest v2。解封前发生了检索工具意外带回封存件片段的事件，已按
+污染披露处理（冻结记录 §五）——自我封存 ≠ 独立盲测。教学替身结论不得外推到
+真实 LLM 生成；本周仍为零业务效果的只读基线，不宣称生产 SLO 或采用决策。
+
+
 
