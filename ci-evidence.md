@@ -223,3 +223,39 @@ Week 13 变化点：
   `deterministic-baseline-results-v1.jsonl` 行尾搅动按既有口径 `git restore`，
   未入库）。
 
+## 九、Week 14 CI 运行证据（2026-10-08，审批写工具）
+
+```
+CI RUN 2026-10-08T08:22:24+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 78 tests in 25.364s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=34, emissions_checked=53, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=61425; smokes_passed=4/4
+CI RESULT OK | duration=27.9s
+```
+
+证据日志：`evidence/ci-run-w14.log`（本次运行经 `--evidence-file` 指定，未追加污染 w08 日志）。
+
+Week 14 变化点：
+
+- STAGE-2 全量测试 66 → 78（新增 `tests/test_mcp_write_tool.py` 12 个用例：合同/
+  常量/策略三方互锁含写合同 sha256 / 无副作用预览与失控预览计数硬门 / 写参数
+  走私与封闭 schema 十例拒绝 / W-01 无审批 / W-02 过期 / W-03 绑定不匹配与规范化
+  等价 / W-04 幂等重放十次 / W-05 拒绝终态与策略拒绝 / 用尽审批与完成封套核验 /
+  ticket.get 独立核验与不可区分拒绝 / 写读夹具与 13 种子回归总对账 / 脱敏与受限审计）。
+  第 13 周 `test_08` 的「无写入口」设计断言按新边界演进：case_store 保持零写入口，
+  server 模块合法拥有带审批门的写入口（preview_create/create/get_ticket），
+  写路径效果硬门改由 test_mcp_write_tool.py 独立覆盖。
+- STAGE-3 扫描范围 29 → 34 文件：`mcptool/` 写路径 5 个运行时文件
+  （write_contract/ticket_service/approval/policy/demo_write_approval）纳入，
+  53 个输出点零违规（凭据与政策正文标记零出现；与第 12/13 周同口径）。
+  **批准载荷边界**：`approved_parameters` 属批准载荷，只存审批记录（restricted），
+  不入普通日志 —— 用户面封套与夹具输出经 test_12 断言不含该键。
+- 工具层证据：`week-14/ticket-write-contract-v1.json` 先冻结（sha256
+  `486b9362…b1b9b4`，与 `write_contract.CONTRACT_SHA256` 常量互锁）；写负向夹具
+  W-01..W-05 共 5/5 通过，新增外部效果合计恰 1（W-04 成功路径），拒绝/过期/不匹配/
+  无审批路径全 0；只读夹具 8/8 不受扰，只读工单库快照逐字节一致；13 条回归种子
+  工具在环 13/13 与第 12 周逐字段一致。
+- 第 12/13 周冻结物零改动（78 测试含既有冻结对账用例全绿；全量与 CI 各触发一次
+  baseline jsonl 行尾搅动，均按既有口径 `git restore`，未入库）。
+

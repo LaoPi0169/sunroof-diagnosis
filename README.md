@@ -553,6 +553,63 @@ python -m unittest tests.test_mcp_read_tool -v
 鉴权/边界模式，**不是真实 MCP 传输协议**；rogue/慢速服务端为夹具注入；RAG v1
 no-go 决议不因工具周推翻；接第二个工具（写类）前须重走九问。
 
+## 第 14 周：审批写工具（ticket.preview_create / create / get + 逐次审批 + 幂等执行）
+
+给一线异常路径接上第一个**写工具**：政策冲突（RAG 终态 escalate）后，客服可为
+NS-1042 创建 **1 张**主管复核单到 `billing-supervisor-review` 队列 —— 全程只发生在
+**隔离模拟工单服务**（独立写 store，与只读 case_store 物理分离）。唯一允许效果 =
+`create_one_review_ticket`（可逆，取消属第 15 周运营路径）；硬门 = 无审批/审批过期/
+参数或身份不匹配时外部效果数为 0。三条物理边界：`write_contract.py`（单一规范化
+函数喂预览/审批/执行三处）、`ticket_service.py`（独立写 store + 幂等表）、
+`approval.py`（结构化审批记录，禁止读自然语言当批准）+ `policy.py`（模型外策略，
+引用冻结语料冲突组 upgrade-east-2026-04）。执行前**重读当前审批逐项比对**（绑定
+身份/运行/工具版本/参数/范围/策略/次数/有效期十要素），幂等键
+`{run_id}:ticket.create:1`，`action_completed` 须 `ticket.get` 独立核验；
+`result_unknown` 保留（写后断连对账第 15 周）。工具允许列表 1 → 4。
+
+```
+week-14/state-and-effect-map.md                 # 状态机（含 result_unknown 保留）+ 效果分级 + 硬门
+week-14/effect-classification-v1.md             # 效果分类八问 + 一句话检验
+week-14/ticket-write-contract-v1.json           # 封闭写合同（sha256 486b9362…b1b9b4 与代码常量互锁）
+week-14/approval-policy-v1.md                   # 谁可请求/谁可批/什么使批准失效（绑定十要素）
+week-14/approval-record-sample-v1.json          # 审批记录样例（拒绝 + 批准两条实际记录, restricted）
+week-14/effect-audit-sample-v1.jsonl            # 按 run_id 事件链审计样例（restricted）
+week-14/approved-write-test-report-v1.md        # W 夹具逐条 + 四次尝试对账 + 回归 + 验收门映射
+mcptool/write_contract.py                       # 写合同常量 + 单一规范化函数
+mcptool/ticket_service.py                       # 隔离模拟工单服务（唯一写 store, 幂等表）
+mcptool/approval.py                             # 结构化审批服务（拒绝/过期/用尽）
+mcptool/policy.py                               # 模型外策略组件（ticket-create-policy-v1）
+mcptool/server.py                               # 扩展: 无副作用预览 / 执行前再授权写入 / 核验查询
+mcptool/client.py                               # 扩展: 写通道（硬门复验 + 效果增量审计）
+mcptool/run_fixtures.py                         # 扩展: W-01..W-05 写负向夹具（--suite write|all）
+mcptool/demo_write_approval.py                  # 演示: 四次尝试对账（0→1→1→1）
+tests/test_mcp_write_tool.py                    # 12 个写工具用例（全量 66 -> 78）
+```
+
+### 第 14 周验证方式
+
+```powershell
+# 演示：四次尝试（预览 0 → 匹配执行 1 → 改队列复用审批被拒仍 1 → 幂等重放仍 1）
+python -m mcptool.demo_write_approval
+
+# 写负向夹具 W-01..W-05（无审批/过期/改参数/重放/用户拒绝; 期望新增效果合计恰 1）
+python -m mcptool.run_fixtures --suite write
+python -m mcptool.run_fixtures --suite all   # 只读 8 条 + 写 5 条
+
+# 写工具合同测试（互锁/零效果预览/走私/负向四类+拒绝/幂等/核验/脱敏）
+python -m unittest tests.test_mcp_write_tool -v
+```
+
+### 第 14 周结果要点与边界（诚实不夸大）
+
+写夹具 5/5（效果增量 0/0/0/1/0，合计恰 1）、只读夹具 8/8 不受扰、13 种子工具在环
+回归 13/13、全量 66 → 78 全绿；四次尝试外部状态对账 0→1→1→1（SIM-5001）。写效果
+只发生在隔离模拟服务；拒绝/过期/不匹配路径效果恒 0 且 `approval_denied` 是正常
+终态。审批样例与审计样例为固定时钟实际运行导出（属受限审计面，不入普通日志）。
+`result_unknown`/撤销/断连对账/补偿留第 15 周；「请求人逐次确认」仅适用于本低影响
+效果，不外推为通用规则；不宣称真实工单系统安全。
+
+
 
 
 

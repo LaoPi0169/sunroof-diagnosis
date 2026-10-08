@@ -1,0 +1,110 @@
+{
+  "contract_id": "ticket-write-contract-v1",
+  "frozen_at": "2026-10-08",
+  "tools": {
+    "preview": "ticket.preview_create",
+    "create": "ticket.create",
+    "verify": "ticket.get"
+  },
+  "version": "1",
+  "effect": "create_one_review_ticket",
+  "effect_class": "write_once_reversible",
+  "purpose": "为已确认的一线异常路径 (政策冲突需主管复核) 创建 1 张可取消的主管复核工单; 写操作只发生在隔离模拟工单服务, 未审批/过期/不匹配路径外部效果为 0 (回链 specs/business-background.md 3197-3436)",
+  "identities": {
+    "server": "northstar-mcptool-ticket-server@local",
+    "host": "northstar-mcptool-host@local",
+    "note": "教学实现为进程内 Host/Client/Server 三方切分; 无网络无真实工单系统"
+  },
+  "arguments_schema": {
+    "type": "object",
+    "required": ["case_id", "reason_code", "source_refs", "target_queue"],
+    "additional_properties": "reject",
+    "properties": {
+      "case_id": {"type": "string", "min_length": 1},
+      "reason_code": {"type": "string", "enum": ["POLICY_CONFLICT"]},
+      "source_refs": {
+        "type": "array",
+        "items": {"type": "string", "min_length": 1},
+        "min_items": 1,
+        "max_items": 2,
+        "unique_items": true
+      },
+      "target_queue": {"type": "string", "enum": ["billing-supervisor-review", "executive-review"]}
+    }
+  },
+  "queue_enum_note": "schema 层为语法枚举; 策略层只放行 billing-supervisor-review —— 审批后改用 executive-review 越过 schema 到达审批绑定比对层, 得到 approval_mismatch (W-03) 而非 invalid_argument",
+  "canonicalization": {
+    "single_function": "mcptool.write_contract.validate_write_arguments",
+    "applied_at": ["preview", "approval_binding", "execute"],
+    "rules": [
+      "case_id 去首尾空格",
+      "reason_code 去空格并大写化",
+      "source_refs 逐项去空格 + 去重 + 排序",
+      "target_queue 去空格并小写化"
+    ],
+    "note": "规范化在策略判断/展示/审批之前完成; 大小写/空格/顺序改变不产生新审批也不构成绕过 (预览/审批/执行三处共用同一函数)"
+  },
+  "trusted_context": {
+    "keys": ["tenant_id", "user_id", "role"],
+    "source": "authenticated_session (Host 注入; 模型/调用方不可参数覆盖)",
+    "argument_override": "reject",
+    "approval_id_note": "approval_id 由编排层/执行器传入, 不是模型可提供参数; 模型在参数中携带审批键走 schema 层拒绝"
+  },
+  "approval_policy": {
+    "policy_version": "ticket-create-policy-v1",
+    "record_version": "approval-record-v1",
+    "binding_fields": ["requester", "tenant_id", "run_id", "tool", "tool_version", "approved_parameters", "resource_scope", "policy_version", "maximum_uses", "expires_at"],
+    "ttl_seconds": 900,
+    "maximum_uses": 1,
+    "resource_scope_format": "case:{case_id}",
+    "allowed_queues": ["billing-supervisor-review"],
+    "allowed_roles": ["support_agent"],
+    "required_rag_terminal": "escalate",
+    "min_source_refs_for_conflict": 2,
+    "corpus_source": "corpus-manifest-v1.json 的 document_id + conflict_group (第 9/12 周冻结物, 只读装载)",
+    "revocation": "执行前撤销留第 15 周; 本周失效面 = 拒绝 / 过期 / 用尽",
+    "denial_note": "approval_denied 是正常安全业务终态; 编排器不得自动再次询问或改道执行"
+  },
+  "execution": {
+    "reauth_before_execute": true,
+    "reauth_detail": "执行器重读当前审批 (status_now) 逐项比对绑定字段 + 执行时策略再判定; 不信任预览缓存, 不接受模型转述用户已同意",
+    "idempotency_key_format": "{run_id}:ticket.create:{tool_version}",
+    "ordering": "审批存在/拒绝/过期门 -> 绑定逐项比对 -> 执行时策略 -> 幂等重放检查 -> 用尽检查 -> 写入 -> 独立核验",
+    "replay_before_consume": "幂等重放检查先于用尽检查 (重放返回原工单, 不消耗额度不产生新效果); 绑定比对先于重放 (改参数复用审批不被重放掩盖, W-03 仍为 approval_mismatch)",
+    "verification": "action_completed 须由 ticket.get 独立核验 ticket_id/状态/幂等关系 (verified_by=ticket.get); 模型宣称与写返回值不构成完成证据",
+    "result_unknown": "状态机保留 result_unknown (响应丢失不盲重试); 本周实现确定成功/拒绝/过期/不匹配/重放, 系统化对账与补偿在第 15 周"
+  },
+  "result_limit": {"tickets_per_approval": 1, "effects_per_idempotency_key": 1},
+  "deadline_ms": 800,
+  "error_taxonomy": ["invalid_argument", "not_available", "deadline_exceeded", "approval_required", "approval_expired", "approval_mismatch", "contract_violation", "version_mismatch"],
+  "user_safe_messages": {
+    "invalid_argument": "写请求参数不允许",
+    "not_available": "对象不可用或无权访问",
+    "deadline_exceeded": "写操作超时，外部效果未确认，请先对账再决定下一步",
+    "approval_required": "需要有效审批后才能执行",
+    "approval_expired": "审批已过期，请重新预览并确认",
+    "approval_mismatch": "审批与本次动作不匹配，已拒绝执行",
+    "contract_violation": "结果超出合同，已整体拒绝并记录安全事件",
+    "version_mismatch": "工具版本不兼容，本次调用已停用"
+  },
+  "terminals": {
+    "action_preview": {"external_effects": 0, "note": "无副作用预览 (物理隔离: 不接触任何写方法)"},
+    "approval_denied": {"external_effects": 0, "note": "正常安全终态"},
+    "approval_expired": {"external_effects": 0, "note": "安全终态"},
+    "action_completed": {"external_effects": 1, "note": "已由 ticket.get 独立核验"},
+    "result_unknown": {"external_effects": "unknown", "note": "本周保留不实现; 对账与补偿第 15 周"}
+  },
+  "forbidden_effects": ["创建多张复核单", "改变退款状态", "发送客户回复", "修改权限", "写入真实工单系统", "删除数据"],
+  "external_write_effects_note": "唯一允许效果 = 隔离模拟服务 1 张主管复核单 (可逆: 由独立运营路径取消, 取消不是模型可用能力); 硬门 = 无审批或参数不匹配时外部效果数必须为 0",
+  "audit_note": "审计按 run_id 串联 previewed -> approved -> policy_allowed -> write_requested -> write_returned -> external_state_verified -> completed; 细分原因只进受限审计, 批准载荷不入普通日志",
+  "implementation_ref": [
+    "mcptool/write_contract.py",
+    "mcptool/ticket_service.py",
+    "mcptool/approval.py",
+    "mcptool/policy.py",
+    "mcptool/server.py",
+    "mcptool/client.py",
+    "mcptool/run_fixtures.py",
+    "mcptool/demo_write_approval.py"
+  ]
+}
