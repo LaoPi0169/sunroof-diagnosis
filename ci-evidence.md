@@ -128,3 +128,34 @@ Week 10 变化点：
 - 评测层证据：冻结记录 `evaluation-freeze-record-v1.md` 登记 12 件冻结物 sha256，
   程序化核对 12/12 一致（checked=12, bad=0）；保留集标签仅存封存件
   （第 12 周 manifest 冻结后解封一次）；判题边界与开除线见 `eval-plan-v1.md` §5–6。
+
+## 6. 第 11 周 CI 证据（检索比较：BM25 vs 哈希向量，16 → 19 文件）
+
+最终验收运行（Run 1 一次通过，原始日志 `evidence/ci-run-w11.log`）：
+
+```
+CI RUN 2026-10-08T00:43:05+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 47 tests in 22.020s, exit=0  (OK = 41 + 检索比较合同 6)
+[PASS] STAGE-3-redaction :: scanned_files=19, emissions_checked=45, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=49888; smokes_passed=4/4
+CI RESULT OK | duration=26.0s
+```
+
+Week 11 变化点：
+
+- STAGE-2 全量测试 41 → 47（新增 `tests/test_retrieval_comparison.py` 6 个用例：
+  比较清单 sha256 互锁与协议字段对齐 / 统一合同 20 字段 schema + ACL 允许池逐 chunk
+  独立复算与 agent 受限零泄漏 / 确定性重跑（投影排除 latency_ms，两次运行与落盘文件
+  三方一致）/ 保留集零执行 / 失败登记五层归因与结果文件对账 / 12 条回归种子行为锁定）。
+- STAGE-3 扫描范围 16 → 19 文件：检索工具链 `retrieval/contract.py`、`retrieval/labels.py`、
+  `retrieval/run_retrieval_comparison.py` 纳入运行时输出脱敏扫描（45 个输出点零违规）。
+- 零模型调用声明：本周新增代码路径（双检索器 + 标签装载器 + 比较运行器）不含任何
+  模型 API 调用、零业务效果（cost_estimate_usd=0）；候选池语义 100% 复用第 9 周
+  ACL 下推 SQL（先过滤后候选语义不变）。
+- 检索层证据：比较清单 `week-11/retrieval-comparison-manifest-v1.json` 三输入件 sha256
+  绑定（先冻结后运行）；48 例 × 2 检索器逐例落盘（`week-11/keyword-results-v1.jsonl` /
+  `week-11/vector-results-v1.jsonl`）；保留集 12 条零执行（结果文件与 manifest 双声明）。
+- 第 10 周冻结物程序化复核：12 件中 11 件与工作区字节一致；`deterministic-baseline-results-v1.jsonl`
+  与提交 blob 一致（工作区行尾被全量测试重写，内容逐字节同）；`specs/mission-week-10.md`
+  原哈希系记录核对后追加落地记录前的旧值，已按勘误更正（详见冻结记录勘误节）。

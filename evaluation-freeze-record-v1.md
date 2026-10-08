@@ -18,8 +18,18 @@
 | evaluation/eval_contract.py | 7b50405f49b20e2c94018c39a6ee51780a80a6b3be76f6151855dfae73852512 |
 | evaluation/validate_eval_set.py | cc9af479f133f84474d4cece3cd79c5bf862d4f024b9dc5b65e00cbb29657cdb |
 | evaluation/run_deterministic_baseline.py | 4d67206999e74a3b02cd03e9aeb7c8c27b8e36b17cf7c9c9702ecf3c09de1bb1 |
-| specs/mission-week-10.md | d0afa93999994f4794b7603eb7b15cde0fecb37508016a7f61fce8c4944aea34 |
+| specs/mission-week-10.md | b860e1f306b5cd0858f26e522eba6e353cde412af268afefe7aa9bfdbde7f038 |
 | tests/test_eval_contract.py | 18606738be6f1fcdbda54c30ebbf831e477fa1272e2b12bbcaa416edfab8e4f1 |
+
+> **勘误（2026-10-08，第 11 周程序化复核时发现）**: 上表 `specs/mission-week-10.md` 一行的
+> 原 sha256（d0afa939…ea34）系本记录核对时点之后、冻结提交之前为该文件追加
+> "本周工程落地记录"一节前的旧值（第 10 周的 12/12 核对先于该追加执行）。该文件自冻结提交
+> 89da932 起未再改动（git log 佐证），现按当前工作区字节更正为
+> b860e1f306b5cd0858f26e522eba6e353cde412af268afefe7aa9bfdbde7f038（提交 blob 口径为
+> d7c6a2fe3150da05b3f8953d1c0400f0cff028a11dc83a967b34ae9e0e1954f1，差异仅行尾归一）。
+> 复核口径说明: 其余 10 件与本表记录值按工作区字节一致（记录时点即工作区口径）；
+> `deterministic-baseline-results-v1.jsonl` 与提交 blob 一致（其工作区行尾会被全量测试
+> 重写翻转，内容逐字节同）。12 件内容完整性结论不变，仅 mission-week-10.md 一行为过期值更正。
 
 ## 二、保留集封存与解封协议
 

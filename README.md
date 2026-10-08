@@ -414,3 +414,43 @@ python evaluation\run_deterministic_baseline.py
 确定性基线在受限类 agent 例输出 answered 属引擎语义缺口（第 11-12 周评测对象），
 不是评测集缺陷。
 
+## 第 11 周：检索基线比较（keyword vs vector，检索层零生成）
+
+在答案生成之前先回答"该检索谁进第 12 周"：两种检索器共用第 9 周 ACL 下推候选池
+（先过滤后候选）、同一份 48 条公开 gold（第 10 周附录）、top_k=5，先冻结比较清单再运行；
+保留集 12 条零执行；BM25 与余弦分数不可跨检索器比较，只比命中/名次/失败层/分数形态。
+
+```
+week-11/retrieval-comparison-manifest-v1.json  # 先冻结后运行：语料/ACL/考卷/标签 sha256 绑定 + 协议
+week-11/keyword-results-v1.jsonl               # BM25 基线逐例 top-5（48 例，含 rank/score/latency/gold 对照）
+week-11/vector-results-v1.jsonl                # 确定性哈希向量逐例 top-5（教学替身 embedding，诚实标注）
+week-11/retrieval-failure-register-v1.md       # 6 条失败七字段五层归因（dev 4 + cal 登记 2）
+week-11/retrieval-regression-seeds-v1.jsonl    # 12 条回归种子（双检索器行为锁定）
+week-11/retrieval-baseline-report-v1.md        # 切片对比 + 置信信号 + 变更预算执行记录
+week-11/retriever-decision-v1.md               # 五选一裁定（vector 单路晋级 + 降级路径预登记）
+retrieval/contract.py                          # 统一检索合同（ACL 下推池 + BM25 + 哈希向量）
+retrieval/labels.py                            # 公开标签装载器（只读解析冻结附录，覆盖/引用校验）
+retrieval/run_retrieval_comparison.py          # 比较运行器（双跑确定性断言，排除 latency 投影）
+tests/test_retrieval_comparison.py             # 6 个检索合同用例（全量 41 -> 47）
+```
+
+### 第 11 周验证方式
+
+```powershell
+# 检索比较（先冻结后运行；两次运行规范投影一致才落盘；保留集不执行）
+python retrieval\run_retrieval_comparison.py
+
+# 检索合同测试（清单 sha256 互锁 / ACL 零泄漏独立复算 / 确定性 / 保留集 / 登记与种子对账）
+python -m unittest tests.test_retrieval_comparison -v
+```
+
+### 第 11 周结果要点与边界（诚实不夸大）
+
+Recall@5 双检索器 1.0（≥0.7 晋级门达标）——但这是 13/18-chunk 小池的**饱和值**，
+不构成质量结论；真区分度在名次与分数形态：vector 的 top-1 余弦把 8/8 无答案例（≤0.290）
+与可回答例（≥0.304）完全分离，BM25 完全重叠，故裁定 vector 单路晋级、keyword 为降级路径；
+阈值 0.30 类规则未冻结，须保留集验证。受限类 agent 逐例零泄漏（合计 0）；
+冲突对与过期文档 0 chunk 被语料层冻结在候选池外（第 9 周设计），检索层不可见也不可修；
+vector 为教学替身（blake2b 哈希），不宣称生产级语义检索质量；被召回 ≠ 答案正确。
+
+
