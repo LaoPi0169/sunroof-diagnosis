@@ -47,6 +47,13 @@ SCOPE_FILES = [
     os.path.join("generation", "contract.py"),
     os.path.join("generation", "evaluate.py"),
     os.path.join("generation", "run_rag_evaluation.py"),
+    os.path.join("mcptool", "contract.py"),
+    os.path.join("mcptool", "case_store.py"),
+    os.path.join("mcptool", "server.py"),
+    os.path.join("mcptool", "client.py"),
+    os.path.join("mcptool", "run_fixtures.py"),
+    os.path.join("mcptool", "run_regression.py"),
+    os.path.join("mcptool", "demo_lookup.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

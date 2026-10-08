@@ -1,0 +1,80 @@
+{
+  "manifest_id": "mcp-capability-manifest-v1",
+  "frozen_at": "2026-10-08",
+  "freeze_note": "capability 部分在夹具执行前定稿 (与 week-13/mcp-read-contract-v1.json 同值互锁, 由 tests/test_mcp_read_tool.py 锁定); test_summary 与 decision 在夹具运行后按观察补记 (审计式补记, 同 evaluation-freeze-record 先冻结后补记先例)",
+  "capability": {
+    "tool": "case.lookup_context",
+    "version": "1",
+    "effect": "read_only",
+    "external_write_effects": 0,
+    "server_identity": "northstar-mcptool-case-server@local",
+    "host_identity": "northstar-mcptool-host@local",
+    "contract_ref": "week-13/mcp-read-contract-v1.json",
+    "contract_sha256": "882ccd8ba512c10a5b2126ffe0376cab7104d59bd5d5bb3f3e19b40dfb70dbe2",
+    "field_enum": ["task_type", "region", "purchased_at"],
+    "forbidden_fields": ["supervisor_note", "customer_name", "payment_detail"],
+    "allowed_roles": ["support_agent", "supervisor"],
+    "trusted_context_keys": ["tenant_id", "user_id", "role"],
+    "result_limit": {"records": 1, "fields": 3},
+    "deadline_ms": 500,
+    "error_taxonomy": [
+      "invalid_argument",
+      "not_available",
+      "deadline_exceeded",
+      "contract_violation",
+      "version_mismatch"
+    ],
+    "arguments_schema_summary": {
+      "required": ["case_id", "fields"],
+      "additional_properties": "reject",
+      "fields": "封闭枚举 1..3 个, 不重复"
+    },
+    "policy_context": {
+      "rag_manifest": "week-12/rag-system-manifest-v1.json (第 12 周冻结, 本周零改动)",
+      "answering_layer": "第 8 周确定性基线 (现行); RAG 候选 v1 仍为回归参照, 不晋级 (第 12 周裁定维持)",
+      "holdout": "保留集不运行 (已解封+污染披露, 第 12 周决议; 不为练协议推翻 no-go)"
+    },
+    "implementation": {
+      "modules": [
+        "mcptool/contract.py",
+        "mcptool/case_store.py",
+        "mcptool/server.py",
+        "mcptool/client.py"
+      ],
+      "entrypoints": [
+        "python -m mcptool.demo_lookup",
+        "python -m mcptool.run_fixtures [--only R-03]",
+        "python -m mcptool.run_regression"
+      ],
+      "mcp_note": "进程内确定性教学实现 (Host/Client/Server 三方切分), 无网络无真实 MCP SDK; 诚实边界: 练的是合同/鉴权/边界模式, 不是传输协议"
+    },
+    "rollback": "工具与 RAG 管线物理隔离 (generation/* 零改动): 回滚 = 停用 mcptool/* 与 week-13/*, 第 12 周基线不受影响"
+  },
+  "test_summary": {
+    "fixtures": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "ids": ["R-01", "R-02", "R-03", "R-04", "R-05", "X-01", "X-02", "X-03"]
+    },
+    "total_external_write_effects": 0,
+    "store_immutable": true,
+    "regression": {
+      "seeds": 13,
+      "identical": 13,
+      "verdict": "13/13 identical"
+    },
+    "test_report_ref": "week-13/read-tool-test-report-v1.md",
+    "recorded_at": "2026-10-08"
+  },
+  "decision": {
+    "verdict": "continue_with_limits",
+    "summary": "只读工具合同成立: 8/8 夹具通过, 外部写效果全 0, 13 种子工具在环回归与第 12 周逐字段一致; 按第 13 周范围决定 A 推进 (只做工具周), RAG v1 冻结不动",
+    "limits": [
+      "教学实现非真实 MCP 传输 (无网络无 SDK)",
+      "保留集不再运行 (已解封+污染披露)",
+      "RAG v1 no-go 决议不因工具周推翻"
+    ],
+    "next_review": "week-14 (若接第二个工具, 须先过手册同款九问 + 工具目录登记)"
+  }
+}

@@ -501,5 +501,58 @@ NS-HOLD-06（supervisor 语料外问句）池内 top-1 以 0.311 越过 0.30 作
 污染披露处理（冻结记录 §五）——自我封存 ≠ 独立盲测。教学替身结论不得外推到
 真实 LLM 生成；本周仍为零业务效果的只读基线，不宣称生产 SLO 或采用决策。
 
+## 第 13 周：只读 MCP 工具（case.lookup_context@1 + 信任边界 + 工具在环回归）
+
+给一线工单处理接上第一把**只读工具**：`case.lookup_context@1` 从模拟工单系统取回
+工单上下文（task_type/region/purchased_at），替代请求体手工转写 task_context。
+MCP 风格 Host/Client/Server 三方切分为**进程内确定性教学实现**（无网络、无 SDK、
+零业务效果）。合同要素：`effect: read_only`、封闭字段枚举（单次 1..3）、
+`additional_properties: reject`、trusted_context（tenant/role 只来自可信会话，
+参数走私即拒绝）、结果上限 1 记录/3 字段、deadline 500ms、五类错误；服务端二次
+鉴权（不存在/跨租户/不可见一律 not_available，用户面不可区分），超合同结果整体
+拒绝并记安全事件。范围决定 A：本周只做工具周，RAG v1 冻结不动。
+
+```
+week-13/task-tool-decision.md                   # 九问决策 + 一句话检验 + 取消条件
+week-13/mcp-tool-catalog-v1.md                  # 工具目录（登记制 + 手册对照例 + 负向清单）
+week-13/trust-boundary-v1.md                    # 信任边界六分区（逐条对应合同）
+week-13/mcp-read-contract-v1.json               # 封闭只读合同（错误五类/映射表冻结）
+week-13/mcp-capability-manifest-v1.json         # 能力清单（先冻结后补记 + sha256 互锁）
+week-13/read-tool-test-report-v1.md             # R/X 夹具 + 13 种子回归报告
+mcptool/contract.py                             # 合同常量（与 JSON 同值互锁）
+mcptool/case_store.py                           # 只读合成工单库（无写入口）
+mcptool/server.py                               # 服务端：二次鉴权 + 字段过滤
+mcptool/client.py                               # Host：允许列表 + deadline + 封套校验 + 受限审计
+mcptool/run_fixtures.py                         # 夹具运行器（--only 单跑通道）
+mcptool/run_regression.py                       # 13 种子工具在环对账
+mcptool/demo_lookup.py                          # 演示入口
+tests/test_mcp_read_tool.py                     # 10 个工具合同用例（全量 56 -> 66）
+```
+
+### 第 13 周验证方式
+
+```powershell
+# 演示：周宁在 NS-1042 上取回工单上下文（身份来自可信会话，请求不含 tenant/role）
+python -m mcptool.demo_lookup
+
+# 夹具：R-01..R-05 + X-01..X-03（外部写效果恒 0，工单库快照不变；--only 可单跑）
+python -m mcptool.run_fixtures
+python -m mcptool.run_fixtures --only R-03
+
+# 13 条回归种子工具在环对账（与第 12 周锁定行为逐字段一致）
+python -m mcptool.run_regression
+
+# 工具合同测试（合同/清单互锁 / 不可区分性 / 超时 / 超合同拒绝 / 走私 / 零写效果 / 脱敏）
+python -m unittest tests.test_mcp_read_tool -v
+```
+
+### 第 13 周结果要点与边界（诚实不夸大）
+
+夹具 8/8 通过、外部写效果全 0、工单库快照逐字节一致；13 种子工具在环回归 13/13
+与第 12 周逐字段一致（generation/* 零改动，保留集不运行）。教学实现练的是合同/
+鉴权/边界模式，**不是真实 MCP 传输协议**；rogue/慢速服务端为夹具注入；RAG v1
+no-go 决议不因工具周推翻；接第二个工具（写类）前须重走九问。
+
+
 
 

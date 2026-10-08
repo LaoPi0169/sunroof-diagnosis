@@ -193,3 +193,33 @@ Week 12 变化点：
   test_08 对账与失败登记 F12-01；解封结果未用于调参。
 - 第 10 周冻结物与第 11 周交付物未改动（56 测试含既有冻结对账用例全绿；
   封存件 sha256 与 manifest 绑定一致）。
+
+## 八、Week 13 CI 运行证据（2026-10-08）
+
+```
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 66 tests in 27.948s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=29, emissions_checked=51, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=52071; smokes_passed=4/4
+```
+
+证据日志：`evidence/ci-run-w13.log`（本次运行经 `--evidence-file` 指定，未追加污染 w08 日志）。
+
+Week 13 变化点：
+
+- STAGE-2 全量测试 56 → 66（新增 `tests/test_mcp_read_tool.py` 10 个用例：合同/
+  能力清单/常量三方互锁含合同 sha256 / R-01 正常路径恰好 3 字段 / 禁止与未知字段
+  schema 拒绝 / R-03 无权限响应不可区分 / R-04 超时 / R-05 超合同结果整体拒绝 /
+  X-01 身份走私与 X-03 版本不匹配 / 零写效果与工单库快照不可变 / 13 种子工具在环
+  回归 / 受限审计结构与运行时输出脱敏）。
+- STAGE-3 扫描范围 22 → 29 文件：`mcptool/` 7 个运行时文件（contract/case_store/
+  server/client/run_fixtures/run_regression/demo_lookup）全部纳入，51 个输出点
+  零违规（凭据与政策正文标记零出现；与第 12 周同口径）。
+- 工具层证据：`week-13/mcp-read-contract-v1.json` 先冻结（sha256 `882ccd8b…70dbe2`，
+  能力清单绑定 + 单测三方互锁）；夹具 R-01..R-05 + X-01..X-03 共 8/8 通过，
+  外部写效果全 0，工单库快照运行前后逐字节一致；13 条回归种子工具在环对账
+  13/13 与第 12 周逐字段一致（`python -m mcptool.run_regression`）。
+- 第 12 周冻结物与评测工件零改动（66 测试含既有冻结对账用例全绿；全量测试后
+  `deterministic-baseline-results-v1.jsonl` 行尾搅动按既有口径 `git restore`，
+  未入库）。
+

@@ -1,0 +1,78 @@
+{
+  "contract_id": "mcp-read-contract-v1",
+  "frozen_at": "2026-10-08",
+  "tool": "case.lookup_context",
+  "version": "1",
+  "effect": "read_only",
+  "purpose": "从模拟工单系统只读取回一线工单上下文 (task_type/region/purchased_at), 替代调用方在请求体手工转写 task_context; 北辰手册 MCP 周 (business-background.md 2977-3196) F12-02 的首个只读工具",
+  "identities": {
+    "server": "northstar-mcptool-case-server@local",
+    "host": "northstar-mcptool-host@local",
+    "note": "教学实现为进程内 Host/Client/Server 三方切分; 身份字符串是逻辑标识, 无网络无真实服务"
+  },
+  "arguments_schema": {
+    "type": "object",
+    "required": ["case_id", "fields"],
+    "additional_properties": "reject",
+    "properties": {
+      "case_id": {"type": "string", "min_length": 1},
+      "fields": {
+        "type": "array",
+        "items": {"enum": ["task_type", "region", "purchased_at"]},
+        "min_items": 1,
+        "max_items": 3,
+        "unique_items": true
+      }
+    }
+  },
+  "trusted_context": {
+    "keys": ["tenant_id", "user_id", "role"],
+    "source": "authenticated_session (Host 注入; 模型/调用方不可参数覆盖)",
+    "argument_override": "reject",
+    "allowed_roles": ["support_agent", "supervisor"]
+  },
+  "result_limit": {"records": 1, "fields": 3},
+  "deadline_ms": 500,
+  "error_taxonomy": [
+    "invalid_argument",
+    "not_available",
+    "deadline_exceeded",
+    "contract_violation",
+    "version_mismatch"
+  ],
+  "user_safe_messages": {
+    "invalid_argument": "请求字段不允许",
+    "not_available": "对象不可用或无权访问",
+    "deadline_exceeded": "暂不可用，请稍后重试或转人工",
+    "contract_violation": "结果超出合同，已整体拒绝并记录安全事件",
+    "version_mismatch": "工具版本不兼容，本次调用已停用"
+  },
+  "authorization": {
+    "field_enum": ["task_type", "region", "purchased_at"],
+    "forbidden_fields": ["supervisor_note", "customer_name", "payment_detail"],
+    "forbidden_note": "禁止字段永不在字段枚举内: 越权请求在 schema 层即 invalid_argument, 不暴露对象存在性",
+    "object_scope": "同租户且角色可见; 不存在/跨租户/角色不可见一律 not_available (用户面逐字节一致, 细分原因只进受限审计)",
+    "server_recheck": "服务端对每次调用独立重做封闭校验与四级鉴权 (不信任 Host 转述)"
+  },
+  "task_type_category_map": {
+    "note": "工单系统 task_type 词表与评测集 task_context.category 的冻结映射 (回归对账桥; contract.py 与能力清单同值互锁)",
+    "billing_general_inquiry": "billing_general",
+    "plan_upgrade_price_difference": "price_difference_east",
+    "out_of_scope_inquiry": "outside_corpus",
+    "upgrade_effective_date_conflict": "upgrade_conflict",
+    "legacy_policy_reference_check": "expired_reference",
+    "special_refund_request": "restricted_refund"
+  },
+  "bounded_context": {
+    "reads": "仅工单库合成案例的 3 个枚举字段 + record_version/read_at 元数据",
+    "never_reads": "政策正文 / 受限工单字段 (supervisor_note 等) / 任何凭据",
+    "policy_context": "RAG 政策上下文仍只来自第 12 周冻结 manifest + 第 8 周确定性基线; 本工具不触任何政策文本"
+  },
+  "external_write_effects": 0,
+  "implementation_ref": [
+    "mcptool/contract.py",
+    "mcptool/case_store.py",
+    "mcptool/server.py",
+    "mcptool/client.py"
+  ]
+}
