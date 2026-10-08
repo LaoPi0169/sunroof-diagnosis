@@ -71,7 +71,8 @@
 - 解封时间: 2026-10-08；执行: `python generation/run_rag_evaluation.py --splits all --unseal-holdout`（唯一一次；结果文件存在即拒绝重写）。
 - 候选: `northstar-rag-readonly-v1`（manifest `week-12/rag-system-manifest-v1.json`，冻结于解封前，输入 sha256 运行时校验通过）。
 - 结果文件: `week-12/rag-per-case-results-v1.jsonl`（60 行）
-  sha256 = `5a614cda697c90990b5a035c8ac3cedf42ab47977085aa9d3af644f40da8dfed`。
+  sha256 = `5a614cda697c90990b5a035c8ac3cedf42ab47977085aa9d3af644f40da8dfed`
+  （LF 归一化口径；git 检出 CRLF 转换下以归一值对账，内容仍逐字节锁定）。
 - **污染披露**: 解封前（同日早些时候），仓库全文代码检索工具在搜索 `required_facts` 时
   意外返回封存件 12 条标签的片段（工具无封存意识，非人工开启）。处理：如实登记于此；
   门控设计与阈值只依据公开材料（第 11 周移交信号 + dev 标定）；保留集结果属

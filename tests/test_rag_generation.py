@@ -58,6 +58,12 @@ def _sha256(path: str) -> str:
         return hashlib.sha256(f.read()).hexdigest()
 
 
+def _sha256_normalized(path: str) -> str:
+    """LF 归一化 sha256: 内容逐字节锁定但容忍 git 检出的 CRLF 行尾转换。"""
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def _load_jsonl(path: str) -> list:
     with open(path, "r", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
@@ -332,7 +338,7 @@ class RagGenerationTest(unittest.TestCase):
         with open(FREEZE_RECORD_PATH, "r", encoding="utf-8") as f:
             freeze_text = f.read()
         self.assertIn(UNSEAL_SECTION_MARKER, freeze_text)
-        self.assertIn(_sha256(RESULTS_PATH), freeze_text)
+        self.assertIn(_sha256_normalized(RESULTS_PATH), freeze_text)
         self.assertIn("污染披露", freeze_text)
         # 封存件哈希与 manifest 绑定一致 (解封运行前后未被改动)
         self.assertEqual(_sha256(SEALED_PATH),

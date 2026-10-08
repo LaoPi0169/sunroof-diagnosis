@@ -90,3 +90,7 @@ no-go 亦算评测通过——通过的是过程不是候选）。
    `python -m unittest` 输出被用例内 print 淹没需过滤；PowerShell 控制台 GBK 显示
    UTF-8 乱码（文件本身无恙，改用 read_files / editor 工具操作）。
 6. **CI**：四阶段一次通过（56 tests / 22 文件 46 输出点 0 违规 / 冒烟 4/4，25.0s）。
+7. **合并后检出 CRLF 坑**：`--no-ff` 合并检出把 results jsonl 转成 CRLF，test_08 的
+   字节级 sha256 对账断裂——对账改为 LF 归一化哈希（内容锁定强度不变），冻结记录
+   注记口径；`deterministic-baseline-results-v1.jsonl` 在 main 复跑全量测试后再次被
+   重写行尾，收尾 restore（老坑，两次还原）。
