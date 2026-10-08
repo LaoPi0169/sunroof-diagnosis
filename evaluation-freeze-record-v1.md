@@ -65,3 +65,29 @@
 | 11 | 数字全部分母/切片/版本（eval-plan §5 表） | 通过 |
 | 12 | 课程阈值未写成行业/客户/生产承诺（eval-plan §1/README 边界） | 通过 |
 | 13 | 工程门: 全量测试 41/41；本地 CI 4 阶段 PASS；sha256 一致；封存件未改 | 通过（本记录时刻） |
+
+## 五、解封记录（第 12 周）
+
+- 解封时间: 2026-10-08；执行: `python generation/run_rag_evaluation.py --splits all --unseal-holdout`（唯一一次；结果文件存在即拒绝重写）。
+- 候选: `northstar-rag-readonly-v1`（manifest `week-12/rag-system-manifest-v1.json`，冻结于解封前，输入 sha256 运行时校验通过）。
+- 结果文件: `week-12/rag-per-case-results-v1.jsonl`（60 行）
+  sha256 = `5a614cda697c90990b5a035c8ac3cedf42ab47977085aa9d3af644f40da8dfed`。
+- **污染披露**: 解封前（同日早些时候），仓库全文代码检索工具在搜索 `required_facts` 时
+  意外返回封存件 12 条标签的片段（工具无封存意识，非人工开启）。处理：如实登记于此；
+  门控设计与阈值只依据公开材料（第 11 周移交信号 + dev 标定）；保留集结果属
+  **污染后的演示性验证**，"自我封存 ≠ 独立盲测"的声明加重成立。
+- 结果摘要: L1 1.0；L2 1.0（29/29）；L3 0.8333（5/6，≥0.8 达标）；
+  **L4 0.9（9/10，<100% 硬门未达标）**；L5 1.0（48/48，冻结分母）；
+  L6 1.0（30/30）；L7 泄漏 0。
+- 硬门失败（唯一）：**NS-HOLD-06**「复核：副卡注销的流程依据是什么？」——池内 top-1
+  billing-general-v3#s07（投诉与升级路径）以 0.311 越过 0.30 作答线，候选自信作答，
+  期望 refused。归因 generation/refusal 层（置信信号在 supervisor 18-chunk 池分离性不足）。
+  次级失败：**NS-HOLD-08**「升级生效日 9 月 1 日前后客户怎么答复？」——冲突雷达 0.268
+  达阈值但意图支配失败（池内 top-1 0.299），落为 no_source 拒答（期望 needs_review），
+  归因 generation/conflict 层（安全侧失败，无硬门违规）。
+- 评测器局限（同次运行发现，如实登记）：事实规则引擎的 fall-through 语义会把
+  "状态不符"的 required_fact 交由后续宽松规则判 hit（HOLD-06 出现一例虚 True，
+  不影响 L3 分母归类）；评测器与候选同属冻结系统，均不改不重跑，修复留 v2。
+- 纪律声明：解封结果**未用于任何调参**；阈值/词表/映射与冻结时逐字节一致；
+  修复动作全部登记入 `week-12/failure-register-v1.jsonl` 留给 v2。
+

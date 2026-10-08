@@ -1,0 +1,106 @@
+{
+  "manifest_id": "rag-system-manifest-v1",
+  "candidate_id": "northstar-rag-readonly-v1",
+  "frozen_at": "2026-10-08",
+  "frozen_before_unseal": true,
+  "freeze_note": "本 manifest 在保留集解封之前冻结 (eval-plan-v1.md §7); 冻结后阈值/词表/映射/规则不得再改, 改即整体 v2 并重跑全部评测。",
+  "generation": {
+    "mode": "deterministic-teaching-stand-in",
+    "description": "本机无模型 API —— 生成层 = 允许池命中 chunk 的抽取式组装 (逐字引用, 不改写不补写) + 确定性门控; 如实标注: 非模型生成、无提示词。",
+    "model_endpoint": null,
+    "model_endpoint_checked_at": null,
+    "model_endpoint_check_note": "课程环境无任何模型 API 可用; 若接入真实模型, 须整版升 v2 并重跑全部评测。",
+    "prompt_version": "none-deterministic-extractive-composer-v1",
+    "model_output_business_effect": "zero (只读; 无写工具、无业务状态变更)"
+  },
+  "bindings": {
+    "corpus_version": "northstar-corpus-w09-v1",
+    "dataset_version": "northstar-eval-w10-v1",
+    "retriever_version": "vector-hashed-ngram-v1",
+    "retriever_decision": "week-11/retriever-decision-v1.md (vector 单路晋级, keyword 为对照与降级路径)",
+    "evaluator_version": "rag-evaluator-v1",
+    "code_base_revision": "d6857eb",
+    "input_sha256": {
+      "eval-set-v1.jsonl": "861116958aa920e11ead1d91fd563c548f69af662be71e3e72004c73b6c817a5",
+      "corpus-manifest-v1.json": "41d127ed0785df040afd0ba801a7bc5c08f88cd4c6baedad2cd526bf4a67cda1",
+      "labeling-guide-v1.md": "60beaa1b56b1185f0ca9e92e97313e1db9b779a90f4d649831c7ee59e2d0010a",
+      "eval-holdout-labels-sealed-v1.json": "4def6aafd98d391e762ec615ecf687668651e7796242545f3d64712a496ce4f9"
+    }
+  },
+  "thresholds": {
+    "answer_min_cosine": 0.30,
+    "refusal_no_source_cosine": 0.30,
+    "conflict_radar_cosine": 0.26,
+    "expired_radar_cosine": 0.20,
+    "quarantine_radar_cosine": 0.35,
+    "rationale": {
+      "answer_min_cosine": "第 11 周移交区间 0.29-0.31 的中点; dev+cal 分离余量: 无答案最高 0.290 / 可回答最低 0.304 (薄余量, 解封验证即赌注, 如实披露)",
+      "refusal_no_source_cosine": "与作答线同值: 全库 top-1 低于它记 no_source_in_corpus",
+      "conflict_radar_cosine": "dev 冲突例雷达 0.264-0.450; 必须叠加意图支配 (雷达 > 池内 top-1) 才不误伤可回答例 (其雷达最高 0.358 但从不支配)",
+      "expired_radar_cosine": "dev 过期例雷达 0.212-0.291; 同样叠加意图支配; 问面词门兜住雷达弱信号例 (DEV-32)",
+      "quarantine_radar_cosine": "防御纵深值 (dev+cal 无一例触发); 隔离件永不作答"
+    }
+  },
+  "routing": {
+    "gate_order": [
+      "unknown_role_refusal",
+      "conflict: radar(conflict_review 源文件余弦 >= conflict_radar_cosine 且 > 池内 top-1) 或 问面冲突感知词门",
+      "expired: radar(expired 源文件余弦 >= expired_radar_cosine 且 > 池内 top-1) 或 问面旧版依据词门(版本对比问句豁免)",
+      "unauthorized: 全库 top-1 不在角色允许池且 >= refusal_no_source_cosine -> escalate (不透露受限身份/存在性)",
+      "quarantine: radar(quarantined 源文件余弦 >= quarantine_radar_cosine 且 > 池内 top-1) -> 拒答",
+      "no_source: 池内 top-1 < answer_min_cosine -> 拒答 (全库 top-1 < refusal_no_source_cosine 记 no_source_in_corpus, 否则 insufficient_evidence)",
+      "answer: 抽取式组装池内 chunk (score >= answer_min_cosine, 上限 3 条)"
+    ],
+    "routing_inputs": "query + user_role + 语料状态元数据 (manifest 状态/源文件); 显式排除 task_context.category —— 类别与期望状态族 1:1, 用它路由等于读答案, 已如实弃用",
+    "radar": {
+      "granularity": "document (非 accepted* 文档 0 chunk 不在候选池, 第 9 周冻结; 信号源 = manifest 登记源文件, content_sha256 逐字节校验)",
+      "usage": "只用于路由判定 (检测), 雷达文本绝不进入输出正文"
+    },
+    "guards": {
+      "conflict_topic_tokens": ["升级", "公告", "通知"],
+      "conflict_marker_tokens": ["冲突", "不一致", "优先", "区别", "不一样", "哪个", "哪一版", "效力"],
+      "expired_guard_tokens": ["2025", "旧版", "老政策", "仍有效", "还能引用", "还能用"],
+      "current_period_tokens": ["2026", "现行", "现在"],
+      "comparison_marker_tokens": ["不一样", "对比", "比较", "差别", "区别", "变化", "不同"],
+      "note": "与 generation/contract.py 常量同值 (测试断言); 词表从公开判例模板 + dev 信号表导出, 是确定性规则而非语义理解, 措辞剧变会失效 (登记为 generation 层局限)"
+    }
+  },
+  "state_mapping": {
+    "answered": "answered",
+    "abstained+conflicting_current_sources": "needs_review",
+    "abstained+only_expired_sources": "refused",
+    "abstained+source_quarantined": "refused",
+    "abstained+insufficient_authorized_context": "refused",
+    "abstained+no_source_in_corpus": "refused",
+    "abstained+insufficient_evidence": "refused",
+    "escalate": "escalated",
+    "note": "三态运行词表 -> 第 10 周四态期望词表 (answered/needs_review/refused/escalated) 的预注册映射"
+  },
+  "fact_check_rules": {
+    "order": [
+      "fact_cites_registered_document",
+      "fact_restricted_guard_or_supervisor",
+      "fact_out_of_scope_refusal",
+      "fact_deprecated_guard",
+      "fact_conflict_disclosure",
+      "fact_transfer_path",
+      "fact_version_source_attached"
+    ],
+    "source": "触发词只来自 labeling-guide-v1.md §每族模板 (公开) ; 不含任何封存字符串",
+    "miss_semantics": "规则按序扫描, 首个判定为真即命中; 触发但未通过则继续; 全部走完 = miss (保守, 逐条留痕)",
+    "denominator_note": "dev/cal 公开标签只有 gold/forbidden/expected_state 三列 (无事实串), L3 答案保真只在含 required_facts 的保留集 answered 例上计算; dev/cal 回答例做机械引用保真检查 (引用可解析 + 答案逐字含引用正文)"
+  },
+  "unseal_protocol": {
+    "precondition": "本 manifest 冻结 + 输入 sha256 校验通过",
+    "command": "python generation/run_rag_evaluation.py --splits all --unseal-holdout",
+    "once_discipline": "结果文件存在即拒绝重写; 解封只执行一次, 结果不得用于调参; 重跑须移走旧文件并如实记录",
+    "contamination_disclosure": "2026-10-08 冻结前, 仓库全文代码检索工具在搜索 required_facts 时意外返回封存件 12 条标签片段 (工具无封存意识)。处理: 如实登记 (冻结记录解封小节 + 报告边界 + 决策备忘); 门控设计与阈值只依据公开材料 (第 11 周移交信号 + dev 标定); 保留集结果属污染后演示性验证, 自我封存 ≠ 独立盲测的声明加重成立。"
+  },
+  "honesty_notes": [
+    "生成替身身份如实标注: 无模型、抽取式, 结论不得外推到真实 LLM 生成",
+    "0.30 作答线是薄余量冻结 (0.014 分离带), 第 11 周已声明这是赌解封验证的赌注",
+    "冲突对 0 chunk 不可见 (第 11 周 corpus 层失败登记): abstained 不引用冲突文档, 冲突组身份不出现在输出",
+    "路由不使用 task_context.category (意图标签捷径), 检索/雷达/词面信号 only",
+    "确定性双遍计算 + unseal-once 落盘守卫; cost_estimate_usd=0.0 为本地教学口径"
+  ]
+}

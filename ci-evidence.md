@@ -159,3 +159,37 @@ Week 11 变化点：
 - 第 10 周冻结物程序化复核：12 件中 11 件与工作区字节一致；`deterministic-baseline-results-v1.jsonl`
   与提交 blob 一致（工作区行尾被全量测试重写，内容逐字节同）；`specs/mission-week-10.md`
   原哈希系记录核对后追加落地记录前的旧值，已按勘误更正（详见冻结记录勘误节）。
+
+## 7. 第 12 周 CI 证据（只读 RAG 评测：三态回答 + 一次解封，19 → 22 文件）
+
+最终验收运行（Run 1 一次通过，原始日志 `evidence/ci-run-w12.log`）：
+
+```
+CI RUN 2026-10-08T02:20:17+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 56 tests in 22.786s, exit=0  (OK = 47 + RAG 评测合同 9)
+[PASS] STAGE-3-redaction :: scanned_files=22, emissions_checked=46, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=64280; smokes_passed=4/4
+CI RESULT OK | duration=25.0s
+```
+
+Week 12 变化点：
+
+- STAGE-2 全量测试 47 → 56（新增 `tests/test_rag_generation.py` 9 个用例：manifest
+  冻结门与解封守卫 / 三态回答合同 schema 与映射完备 / ACL 零泄漏独立复算 /
+  dev+cal 48 例状态门冻结回归 / 双遍确定性 + 词表互锁 / 引用支持逐条验证 /
+  七层指标复算与规则引擎正例自检 / 保留集机制对账（L4=0.9 硬门失败如实锁定）/
+  13 条回归种子逐字段对账）。
+- STAGE-3 扫描范围 19 → 22 文件：`generation/contract.py`、`generation/evaluate.py`、
+  `generation/run_rag_evaluation.py` 纳入（46 个输出点零违规）。**范围声明**：
+  第 12 周评测工件 `week-12/rag-per-case-results-v1.jsonl` 按评测合同必须包含
+  抽取式答案正文（引用即正文，来自冻结语料 DB 动态查询）；"政策正文不入运行时
+  输出"检查保持面向服务端/工具链源码字面量——generation 源码经扫描确认不含
+  正文硬编码常量与任何凭据 marker。
+- 评测层证据：`week-12/rag-system-manifest-v1.json` 解封前冻结（四输入件 sha256
+  绑定 + 阈值/词表/映射/规则预注册）；`week-12/rag-per-case-results-v1.jsonl`
+  60 行一次解封运行落盘（unseal-once 守卫：文件存在即拒绝重写，测试 01 覆盖）。
+- 保留集结果如实呈现：L4=0.9（NS-HOLD-06 自信作答）为唯一硬门失败，已锁进
+  test_08 对账与失败登记 F12-01；解封结果未用于调参。
+- 第 10 周冻结物与第 11 周交付物未改动（56 测试含既有冻结对账用例全绿；
+  封存件 sha256 与 manifest 绑定一致）。
