@@ -59,6 +59,8 @@ SCOPE_FILES = [
     os.path.join("mcptool", "approval.py"),
     os.path.join("mcptool", "policy.py"),
     os.path.join("mcptool", "demo_write_approval.py"),
+    os.path.join("workbench_write", "__init__.py"),
+    os.path.join("workbench_write", "app.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)
