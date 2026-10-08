@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主管复核单 · 审批写工具业务测试工作台</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#c0392b; --warn:#b7791f; --muted:#8a94a6;
+          --line:#dde3ec; --bg:#f5f7fb; --card:#ffffff; --ink:#1c2733; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:#12263f; color:#fff; padding:14px 22px; }
+  header h1 { font-size:18px; margin:0 0 6px; }
+  #run-bar { font-size:13px; color:#c9d6e8; }
+  #run-bar code { background:#1d3a5f; padding:2px 6px; border-radius:4px; }
+  #btn-reset { float:right; background:#2c4a73; color:#fff; border:1px solid #4a6b99;
+               border-radius:6px; padding:4px 12px; cursor:pointer; }
+  main.grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+              gap:16px; padding:16px 22px; max-width:1280px; margin:0 auto; }
+  @media (max-width: 980px) { main.grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:4px 0 10px; }
+  button { font-size:14px; padding:8px 16px; border-radius:8px; cursor:pointer;
+           border:1px solid var(--line); background:#eef2f8; }
+  button.primary { background:#1a5fb4; border-color:#1a5fb4; color:#fff; }
+  button.danger  { background:#fff; border-color:#c0392b; color:#c0392b; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:10px; margin-bottom:8px; }
+  label { display:block; font-size:13px; margin:8px 0 3px; }
+  input { width:100%; padding:7px 10px; border:1px solid var(--line);
+          border-radius:6px; font-size:13px; font-family:Consolas, monospace; }
+  code { background:#eef2f8; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .verdict { padding:9px 12px; border-radius:8px; font-size:13.5px; margin:8px 0; }
+  .verdict.ok   { background:#e8f5ec; color:var(--ok); border:1px solid #bfe3c9; }
+  .verdict.bad  { background:#fdecea; color:var(--bad); border:1px solid #f5c6c0; }
+  .verdict.warn { background:#fdf6e7; color:var(--warn); border:1px solid #f0dcae; }
+  .verdict.info { background:#eef2f8; color:#1c2733; border:1px solid var(--line); }
+  table.params { border-collapse:collapse; width:100%; font-size:12.5px; margin:6px 0; }
+  table.params th, table.params td { border:1px solid var(--line); padding:4px 8px;
+                                     text-align:left; word-break:break-all; }
+  table.params th { background:#f2f6fc; width:130px; }
+  details { margin-top:6px; }
+  details summary { cursor:pointer; font-size:12.5px; color:var(--muted); }
+  pre { background:#12263f; color:#d7e4f5; padding:10px; border-radius:8px;
+        font-size:11.5px; overflow:auto; max-height:340px; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .ticket { border:1px solid var(--line); border-radius:8px; padding:7px 10px;
+            font-size:12.5px; margin:6px 0; background:#fbfcfe; }
+  .audit { max-height:420px; overflow:auto; }
+  .audit-line { font-size:12.5px; padding:4px 6px; border-bottom:1px dashed var(--line);
+                word-break:break-all; }
+  .audit-line .idx { display:inline-block; min-width:20px; color:var(--muted); }
+  .fx { color:var(--ok); }
+  .stat { display:inline-block; margin-right:14px; font-size:13.5px; }
+  .stat b { font-size:16px; }
+</style>
+</head>
+<body>
+<header>
+  <button id="btn-reset">重置演示环境</button>
+  <h1>主管复核单 · 审批写工具业务测试工作台（第 14 周增补交付）</h1>
+  <div id="run-bar">本次运行 run_id: <code id="run-id">—</code> · 幂等键: <code id="idem-key">—</code> · 会话: 客服 周宁（教学模拟）</div>
+</header>
+<main class="grid">
+  <section class="left">
+    <div class="card">
+      <h2>业务场景</h2>
+      <p style="font-size:13.5px; line-height:1.7; margin:4px 0;">
+        客服 <b>周宁</b> 处理工单 <b>NS-1042</b>：两份现行政策冲突（冲突组
+        <code>upgrade-east-2026-04</code>：<code>upgrade-east-v2</code> 与
+        <code>upgrade-notice-v4</code>），RAG 终态已为 <b>escalate</b>。
+        目标：为该工单创建 <b>1 张</b>主管复核单到 <code>billing-supervisor-review</code> 队列。
+        全程只发生在<b>隔离模拟工单服务</b>，不影响任何真实系统。</p>
+    </div>
+
+    <div class="card">
+      <h2>步骤 1 · 生成预览（无副作用）</h2>
+      <p class="hint">预览会把输入规范化（大小写 / 空格 / 顺序），并展示「将要创建什么」。预览不产生任何外部效果。</p>
+      <button id="btn-preview" class="primary">生成预览</button>
+      <div id="result-preview"></div>
+    </div>
+
+    <div class="card">
+      <h2>步骤 2 · 你来决定（受控确认动作）</h2>
+      <p class="hint">审批只认这里的结构化决定，不认任何聊天文本。拒绝是正常安全终态（系统不会自动重新询问）。</p>
+      <div class="row">
+        <button id="btn-approve" class="primary">批准（签发逐次审批）</button>
+        <button id="btn-deny" class="danger">拒绝（记录拒绝）</button>
+      </div>
+      <div id="result-decide"></div>
+    </div>
+
+    <div class="card">
+      <h2>步骤 3 · 执行创建（唯一产生效果的入口）</h2>
+      <p class="hint">执行前服务端会重读审批并逐项比对。你可以故意修改下面任意字段再执行来观察拦截；
+        <b>不改任何字段重复点击 = 幂等重放</b>。目标队列另一个合法语法是 <code>executive-review</code>（但策略只放行主管复核队列）。</p>
+      <label>工单号 case_id</label>
+      <input id="f-case">
+      <label>原因代码 reason_code</label>
+      <input id="f-reason">
+      <label>引用来源 source_refs（逗号分隔，1..2 条）</label>
+      <input id="f-refs">
+      <label>目标队列 target_queue</label>
+      <input id="f-queue">
+      <div style="margin-top:10px;">
+        <button id="btn-execute" class="primary">按当前审批执行</button>
+      </div>
+      <div id="result-execute"></div>
+    </div>
+
+    <div class="card">
+      <h2>步骤 4 · 核验查询（独立只读）</h2>
+      <p class="hint">完成必须由独立读取证明，不由写返回值或任何人的转述证明。</p>
+      <div class="row">
+        <input id="verify-id" style="flex:1;" placeholder="输入工单号，如 SIM-5001">
+        <button id="btn-verify">查询工单</button>
+      </div>
+      <div id="result-verify"></div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="card">
+      <h2>外部状态（唯一可信证据）</h2>
+      <div>
+        <span class="stat">模拟工单总数 <b id="ticket-total">0</b></span>
+        <span class="stat">累计外部效果 <b id="effects">0</b></span>
+        <span class="stat">安全事件 <b id="secevents">0</b></span>
+      </div>
+      <div id="ticket-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>当前审批状态 <span class="muted">（restricted）</span></h2>
+      <div id="approval-panel"><p class="muted">尚未做出决定</p></div>
+    </div>
+
+    <div class="card">
+      <h2>受限审计链 <span class="muted">（restricted）</span></h2>
+      <div id="audit-panel" class="audit"><p class="muted">（空）</p></div>
+    </div>
+  </aside>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path, payload) {
+  const opt = payload === undefined ? {} : {
+    method: "POST",
+    headers: {"Content-Type": "application/json; charset=utf-8"},
+    body: JSON.stringify(payload),
+  };
+  const resp = await fetch(path, opt);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw data;
+  return data;
+}
+
+function formValues() {
+  return { case_id: $("f-case").value, reason_code: $("f-reason").value,
+           source_refs: $("f-refs").value, target_queue: $("f-queue").value };
+}
+function setForm(form) {
+  $("f-case").value = form.case_id; $("f-reason").value = form.reason_code;
+  $("f-refs").value = form.source_refs; $("f-queue").value = form.target_queue;
+}
+
+function verdict(envelope) {
+  const s = envelope.status;
+  if (s === "action_preview") return {cls:"ok", text:"预览成功：外部效果 0（工单总数不变）"};
+  if (s === "action_completed")
+    return {cls:"ok", text:"完成：已创建 " + envelope.ticket_id +
+      "（verified_by=" + envelope.verified_by + " 独立核验）"};
+  if (s === "approval_denied")
+    return {cls:"warn", text:"策略拒绝（approval_denied 是正常安全终态，外部效果 0）"};
+  if (s === "ok")
+    return {cls:"ok", text:"查询成功：" + envelope.records.length + " 条记录（只读，外部效果 0）"};
+  if (s === "error")
+    return {cls:"bad", text:"被拦截：" + envelope.error.code + " —— " + envelope.error.message};
+  return {cls:"info", text:"状态：" + s};
+}
+
+function paramsTable(c) {
+  if (!c) return "";
+  const row = (k, v) => "<tr><th>" + k + "</th><td><code>" + esc(JSON.stringify(v)) + "</code></td></tr>";
+  return "<table class='params'>" + row("case_id", c.case_id) + row("reason_code", c.reason_code) +
+    row("source_refs", c.source_refs) + row("target_queue", c.target_queue) + "</table>";
+}
+
+function recordTable(records) {
+  return records.map((r) => "<table class='params'>" +
+    Object.keys(r).map((k) => "<tr><th>" + esc(k) + "</th><td><code>" + esc(JSON.stringify(r[k])) + "</code></td></tr>").join("") +
+    "</table>").join("");
+}
+
+function showResult(id, envelope, state) {
+  const v = verdict(envelope);
+  let html = "<div class='verdict " + v.cls + "'>" + esc(v.text) + "</div>";
+  if (envelope.canonical_parameters) html += paramsTable(envelope.canonical_parameters);
+  if (envelope.records) html += recordTable(envelope.records);
+  html += "<details><summary>原始返回 JSON</summary><pre>" +
+          esc(JSON.stringify(envelope, null, 2)) + "</pre></details>";
+  $(id).innerHTML = html;
+  renderState(state);
+}
+
+function showDecision(record, state) {
+  const ok = record.decision === "approved";
+  let html = "<div class='verdict " + (ok ? "ok" : "warn") + "'>" +
+    (ok ? "已批准：逐次审批已签发（一次批准一次使用，有效期 15 分钟）"
+        : "已拒绝：拒绝是正常安全终态（不可执行、不可复用，系统不自动重问）") + "</div>";
+  html += "<table class='params'><tr><th>记录 ID</th><td><code>" + esc(record.approval_id) + "</code></td></tr>";
+  if (record.uses !== undefined)
+    html += "<tr><th>使用额度</th><td><code>" + record.uses + " / " + record.maximum_uses + "</code></td></tr>" +
+            "<tr><th>签发 / 过期</th><td><code>" + esc(record.issued_at) + " → " + esc(record.expires_at) + "</code></td></tr>" +
+            "<tr><th>绑定参数（restricted）</th><td><code>" + esc(JSON.stringify(record.approved_parameters)) + "</code></td></tr>" +
+            "<tr><th>资源范围 / 策略</th><td><code>" + esc(record.resource_scope) + " · " + esc(record.policy_version) + "</code></td></tr>";
+  else
+    html += "<tr><th>被拒参数（restricted）</th><td><code>" + esc(JSON.stringify(record.proposed_parameters)) + "</code></td></tr>" +
+            "<tr><th>决定时刻</th><td><code>" + esc(record.decided_at) + "</code></td></tr>";
+  html += "</table><details><summary>原始审批记录 JSON（restricted）</summary><pre>" +
+          esc(JSON.stringify(record, null, 2)) + "</pre></details>";
+  $("result-decide").innerHTML = html;
+  renderState(state);
+}
+function showErr(id, err) {
+  $(id).innerHTML = "<div class='verdict bad'>请求失败：" +
+    esc(err.detail || err.error || JSON.stringify(err)) + "</div>";
+}
+
+function renderState(state) {
+  $("run-id").textContent = state.run_id;
+  $("idem-key").textContent = state.idempotency_key;
+  $("ticket-total").textContent = state.ticket_total;
+  $("effects").textContent = state.external_write_effects;
+  $("secevents").textContent = state.security_events.length;
+  const tl = $("ticket-list");
+  tl.innerHTML = state.tickets.length ? state.tickets.map((t) =>
+    "<div class='ticket'><b>" + esc(t.ticket_id) + "</b>（" + esc(t.state) + "）· 工单 " +
+    esc(t.case_id) + " · 队列 <code>" + esc(t.target_queue) + "</code> · 请求人 " +
+    esc(t.requested_by) + " · 创建于 " + esc(t.created_at) + "</div>").join("")
+    : "<p class='muted'>（空 —— 没有任何工单被创建）</p>";
+  const p = $("approval-panel");
+  if (!state.decision_id) p.innerHTML = "<p class='muted'>尚未做出决定</p>";
+  else {
+    const r = state.decision_record_restricted || {};
+    const eff = state.decision_effective_status;
+    const effCls = eff === "approved" ? "ok" : (eff === "denied" ? "warn" : "bad");
+    let html = "<p style='font-size:13px; margin:4px 0;'>记录 ID: <code>" + esc(state.decision_id) +
+      "</code><br>决定: <b>" + esc(r.decision || state.decision) +
+      "</b> · 当前有效状态: <b class='" + effCls + "'>" + esc(eff) + "</b></p>";
+    if (r.maximum_uses !== undefined)
+      html += "<p style='font-size:13px; margin:4px 0;'>使用额度: " + r.uses + " / " + r.maximum_uses + "</p>";
+    if (r.expires_at) {
+      const remain = Math.max(0, Math.round((Date.parse(r.expires_at) - Date.parse(state.server_now)) / 1000));
+      html += "<p style='font-size:13px; margin:4px 0;'>过期于 <code>" + esc(r.expires_at) +
+              "</code>（剩余 " + remain + " 秒）</p>";
+    }
+    p.innerHTML = html;
+  }
+  const a = $("audit-panel");
+  a.innerHTML = state.audit_restricted.length ? state.audit_restricted.map((e, i) =>
+    "<div class='audit-line'><span class='idx'>" + (i + 1) + "</span><code>" + esc(e.tool) +
+    "</code> → <b>" + esc(e.outcome) + "</b>" +
+    (e.reason_typed ? " <span class='muted'>(" + esc(e.reason_typed) + ")</span>" : "") +
+    (e.external_write_effects ? " <b class='fx'>+" + e.external_write_effects + " 外部效果</b>" : "") +
+    "</div>").join("") : "<p class='muted'>（空）</p>";
+}
+
+$("btn-preview").onclick = async () => {
+  try { const d = await api("/api/preview", formValues());
+        showResult("result-preview", d.envelope, d.state); }
+  catch (e) { showErr("result-preview", e); }
+};
+$("btn-approve").onclick = async () => {
+  try { const d = await api("/api/decide", {decision: "approve"});
+        showDecision(d.record, d.state); }
+  catch (e) { showErr("result-decide", e); }
+};
+$("btn-deny").onclick = async () => {
+  try { const d = await api("/api/decide", {decision: "deny"});
+        showDecision(d.record, d.state); }
+  catch (e) { showErr("result-decide", e); }
+};
+$("btn-execute").onclick = async () => {
+  try { const d = await api("/api/execute", formValues());
+        showResult("result-execute", d.envelope, d.state); }
+  catch (e) { showErr("result-execute", e); }
+};
+$("btn-verify").onclick = async () => {
+  try { const d = await api("/api/verify", {ticket_id: $("verify-id").value});
+        showResult("result-verify", d.envelope, d.state); }
+  catch (e) { showErr("result-verify", e); }
+};
+$("btn-reset").onclick = async () => {
+  const s = await api("/api/reset", {});
+  setForm(s.form);
+  ["result-preview", "result-decide", "result-execute", "result-verify"]
+    .forEach((id) => { $(id).innerHTML = ""; });
+  renderState(s);
+};
+
+async function boot() {
+  const s = await api("/api/state");
+  setForm(s.form);
+  renderState(s);
+}
+boot();
+</script>
+</body>
+</html>
+
+
+

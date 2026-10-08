@@ -259,3 +259,33 @@ Week 14 变化点：
 - 第 12/13 周冻结物零改动（78 测试含既有冻结对账用例全绿；全量与 CI 各触发一次
   baseline jsonl 行尾搅动，均按既有口径 `git restore`，未入库）。
 
+## 十、Week 14 增补 CI 运行证据（2026-10-08，业务用户交互工作台）
+
+```
+CI RUN 2026-10-08T12:44:40+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 82 tests in 26.166s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=36, emissions_checked=53, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=55820; smokes_passed=4/4
+CI RESULT OK | duration=28.5s
+```
+
+证据日志：`evidence/ci-run-w14-workbench.log`（新增独立文件，未追加 w14/w08 历史）。
+
+工作台增补变化点（交付物见 README「第 14 周业务用户交互工作台」小节）：
+
+- STAGE-2 全量测试 78 → 82（新增 `tests/test_write_workbench.py` 4 个 API 用例：
+  重置+预览规范化零效果 / 拒绝后执行 approval_required / 批准后改队列
+  approval_mismatch 且额度不消耗 / 匹配执行+幂等重放+核验效果恰 1；与
+  `run_fixtures` W-01..W-05 用户可见子集一一对应）。
+- STAGE-3 扫描范围 34 → 36 文件：`workbench_write/__init__.py` 与
+  `workbench_write/app.py` 入列；53 个输出点零违规（工作台薄壳不打印凭据/
+  政策正文；审批记录与审计链仅在页面 restricted 面板回显给本人，不写日志文件）。
+- `workbench_write/` 是 MCP Host 之上的薄 HTTP 壳：不实现新业务规则、不新增
+  写入口；页面流程（预览 → 拒绝/批准 → 执行/改参/重放 → 核验）与四次尝试
+  对账 0→1→1→1 同构；时钟用真实 UTC（TTL 900s 真实生效，过期路径由
+  W-02 固定时钟自动化覆盖，页面可实测）。
+- 一致性门复验：第 8 周动态发现测试数（82）已同步进 README；baseline jsonl
+  行尾搅动本轮再触发一次，`git restore` 未入库。
+
+

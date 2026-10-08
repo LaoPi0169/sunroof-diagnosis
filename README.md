@@ -609,6 +609,30 @@ python -m unittest tests.test_mcp_write_tool -v
 `result_unknown`/撤销/断连对账/补偿留第 15 周；「请求人逐次确认」仅适用于本低影响
 效果，不外推为通用规则；不宣称真实工单系统安全。
 
+### 第 14 周业务用户交互工作台（无命令行测试入口）
+
+交付业务用户**纯浏览器点击**测试：`workbench_write/` 是 MCP Host 之上的薄 HTTP
+壳（不实现新业务规则、不新增写入口），页面流程「预览 → 拒绝/批准 → 执行（可改参/
+重放）→ 核验」与四次尝试对账一一对应；时钟用真实 UTC（审批 TTL 900s 真实生效，
+等 15 分钟可实测过期路径）。交付人双击 `start_workbench.bat`（或
+`python -m uvicorn workbench_write.app:app --host 127.0.0.1 --port 8014`）启动一次，
+测试者只打开 `http://127.0.0.1:8014`。逐步测试脚本（每步点击路径 + 精确预期 +
+通过判据）见 `week-14/business-user-test-script-v1.md`。
+
+```
+workbench_write/app.py                           # FastAPI 薄壳: 进程内封装 Host/审批/工单栈
+workbench_write/static/index.html                # 中文前台页面（原生 HTML/JS, 零依赖零构建）
+start_workbench.bat                              # 交付人双击启动（自动打开浏览器）
+tests/test_write_workbench.py                    # 4 个工作台 API 用例（全量 78 -> 82）
+week-14/business-user-test-script-v1.md          # 业务用户逐步测试脚本
+```
+
+工作台验证：`python -m unittest tests.test_write_workbench -v`（4 用例），全量
+66 → 78 → 82 全绿；`ci/redaction_scan.py` SCOPE_FILES 34 → 36（工作台 2 个运行时
+文件入列，凭据/政策正文仍零出现）。会话为单用户教学模拟（固定客服周宁），审批/
+审计面板属 restricted 审计面（含批准载荷），仅回显给本人、不写日志文件。
+
+
 
 
 
