@@ -1,6 +1,7 @@
-"""MCP Host/Client (Week 13 只读 + Week 14 审批写) —— 允许列表 + 会话注入 + deadline + 封套校验。
+"""MCP Host/Client (Week 13 只读 + Week 14 审批写 + Week 15 对抗恢复) ——
+允许列表 + 能力清单门 + 会话注入 + deadline + 封套校验 + 断连对账。
 
-Host 职责 (回链 week-13/trust-boundary-v1.md 六分区 + week-14 审批硬门):
+Host 职责 (回链 week-13/trust-boundary-v1.md 六分区 + week-14 审批硬门 + week-15 对抗增量):
   1) 工具允许列表默认关闭: 只读通道仅 case.lookup_context; 写通道仅
      ticket.preview_create / ticket.create / ticket.get (共 4 工具, 版本 pin 1);
   2) 身份注入: tenant/user/role 只从已认证会话来, 调用参数走私身份键即拒绝
@@ -11,7 +12,13 @@ Host 职责 (回链 week-13/trust-boundary-v1.md 六分区 + week-14 审批硬�
      预览封套外部计数必须为 0、错误封套不得伴随外部效果、action_completed
      必须带 verified_by=ticket.get 与精确幂等键, 违规整体拒绝并记安全事件;
   5) 受限审计: 每次调用落 {run_id, caller, outcome, reason_typed, 效果增量} ——
-     细分原因只进审计, 用户面封套永远只有安全文案。
+     细分原因只进审计, 用户面封套永远只有安全文案;
+  6) Week 15: 能力清单门 —— served 工具描述/参数模式摘要与冻结清单
+     (week-15/mcp-capability-manifest-v2.json) 不一致 -> capability_quarantined
+     隔离, 未冻结版本/字段不得自动启用 (A-02/A-05); 写后断连编排 —— 提交成功
+     响应丢失 -> result_unknown -> 按幂等键先查后说 -> action_completed (独立核验)
+     或 reconciliation_pending (禁止伪造终态, 恢复第一动作永远是查询不是再次创建,
+     A-06); 撤销的审批在执行时重读当前状态 -> approval_revoked (A-04)。
 外部效果只可能来自带有效审批的 ticket.create (唯一写入口); 其余路径恒 0。
 """
 from __future__ import annotations
@@ -22,8 +29,9 @@ from . import contract as C
 from . import server as server_mod
 from . import write_contract as W
 from .approval import ApprovalService
+from .capability_manifest import ServedCatalog
 from .policy import WritePolicy
-from .ticket_service import TicketService
+from .ticket_service import QueryUnavailableError, ResponseLostError, TicketService
 
 # Host 全局允许列表 (1 只读 + 3 写; 未注册工具/版本一律拒绝)
 ALLOWED_TOOLS = (C.TOOL_NAME,) + W.WRITE_TOOLS
@@ -48,7 +56,7 @@ class McpHost:
     def __init__(self, session: TrustedSession, *, clock=None,
                  server_fn=None, store=None, deadline_ms=C.DEADLINE_MS,
                  ticket_service=None, approval_service=None, policy=None,
-                 write_deadline_ms=W.DEADLINE_MS):
+                 write_deadline_ms=W.DEADLINE_MS, catalog=None):
         self.session = session
         self._clock = clock or (lambda: time.strftime(
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
@@ -60,6 +68,9 @@ class McpHost:
         self._approval_service = approval_service or ApprovalService()
         self._policy = policy or WritePolicy()
         self._write_deadline_ms = write_deadline_ms
+        # 能力清单门 (Week 15): served 目录缺省 == 冻结清单; 夹具可注入 rogue 描述
+        self._catalog = catalog or ServedCatalog.from_manifest()
+        self._quarantined = set()  # 已隔离能力 (解除须人工 restore_capability)
         self.audit = []            # 受限审计 (含细分 reason_typed; 报告引用须标注 restricted)
         self.security_events = []  # contract_violation 安全事件
         self.external_write_effects = 0  # 累计外部效果增量 (只读调用恒为 0)
@@ -172,7 +183,8 @@ class McpHost:
         }
 
     def call_write(self, tool, arguments, *, run_id, approval_id=None,
-                   rag_terminal=None, delay_seconds=0.0, rogue_mode=None) -> dict:
+                   rag_terminal=None, delay_seconds=0.0, rogue_mode=None,
+                   fail_after_commit=False) -> dict:
         """写工具主入口: 允许列表 + Host 硬门复验 + deadline + 受限审计。
 
         Host 端硬门 (客户端否决权, 不信任服务端自觉):
@@ -197,6 +209,12 @@ class McpHost:
                 entry, W.ERROR_INVALID_ARGUMENT,
                 f"tool_not_in_write_allowlist:{tool}")
 
+        # 1.5) 能力清单门 (Week 15, A-02/A-05): served 描述/模式摘要与冻结清单
+        #      等值比对; 不一致 -> 隔离 + 安全事件 (先于一切业务判定, server 不被打扰)
+        gate_error = self._capability_gate(entry, tool)
+        if gate_error is not None:
+            return gate_error
+
         # 2) Host 层封闭校验 (预览/执行; 服务端独立再校验一次)
         if tool in (W.TOOL_PREVIEW, W.TOOL_CREATE):
             _canonical, err = W.validate_write_arguments(arguments)
@@ -204,26 +222,31 @@ class McpHost:
                 return self._typed_write_error(
                     entry, W.ERROR_INVALID_ARGUMENT, f"schema:{err}")
 
-        # 3) 调用服务端 (deadline 客户端强制; 外部效果以前后计数差观测)
+        # 3) 调用服务端 (deadline 客户端强制; 外部效果以前后计数差观测);
+        #    A-06 断连夹具: 提交成功后响应丢失 -> 本层捕获并进入对账编排
         self.server_calls += 1
         before = self._ticket_service.ticket_count()
         started = time.perf_counter()
-        if tool == W.TOOL_PREVIEW:
-            envelope, reason_typed = server_mod.preview_create(
-                arguments, self.session, now=self._clock(),
-                ticket_service=self._ticket_service, policy=self._policy,
-                rag_terminal=rag_terminal, rogue_mode=rogue_mode)
-        elif tool == W.TOOL_CREATE:
-            envelope, reason_typed = server_mod.create(
-                arguments, self.session, now=self._clock(), run_id=run_id,
-                approval_id=approval_id,
-                approval_service=self._approval_service,
-                ticket_service=self._ticket_service, policy=self._policy,
-                rag_terminal=rag_terminal, rogue_mode=rogue_mode)
-        else:
-            envelope, reason_typed = server_mod.get_ticket(
-                arguments, self.session,
-                ticket_service=self._ticket_service)
+        try:
+            if tool == W.TOOL_PREVIEW:
+                envelope, reason_typed = server_mod.preview_create(
+                    arguments, self.session, now=self._clock(),
+                    ticket_service=self._ticket_service, policy=self._policy,
+                    rag_terminal=rag_terminal, rogue_mode=rogue_mode)
+            elif tool == W.TOOL_CREATE:
+                envelope, reason_typed = server_mod.create(
+                    arguments, self.session, now=self._clock(), run_id=run_id,
+                    approval_id=approval_id,
+                    approval_service=self._approval_service,
+                    ticket_service=self._ticket_service, policy=self._policy,
+                    rag_terminal=rag_terminal, rogue_mode=rogue_mode,
+                    fail_after_commit=fail_after_commit)
+            else:
+                envelope, reason_typed = server_mod.get_ticket(
+                    arguments, self.session,
+                    ticket_service=self._ticket_service)
+        except ResponseLostError:
+            return self._after_response_lost(entry, run_id, before)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         after = self._ticket_service.ticket_count()
         delta = after - before
@@ -261,6 +284,9 @@ class McpHost:
                     violation = f"readonly_verify_with_effects:{delta}"
         elif envelope.get("status") == "error" and delta != 0:
             violation = f"error_envelope_with_effects:{delta}"
+        elif (envelope.get("status") == W.STATUS_RECONCILIATION_PENDING
+                and delta != 0):
+            violation = f"pending_envelope_with_effects:{delta}"
         if violation:
             self.security_events.append({
                 "run_id": run_id,
@@ -275,4 +301,170 @@ class McpHost:
         entry["reason_typed"] = reason_typed
         entry["external_write_effects"] = delta
         self.external_write_effects += delta
+        return envelope
+
+    # ==========================================================================
+    # Week 15: 能力清单门 (A-02/A-05) + 写后断连对账 (A-06) + 能力状态面板
+    # ==========================================================================
+
+    @property
+    def catalog(self) -> ServedCatalog:
+        """served 目录访问 (工作台/夹具注入 rogue 描述用; 比对基准是冻结清单)。"""
+        return self._catalog
+
+    def _capability_gate(self, entry: dict, tool: str):
+        """允许列表之后、一切业务判定之前: served 描述/模式摘要与冻结清单等值比对。
+
+        不一致 -> 该能力隔离 (capability_quarantined) + 安全事件; 已隔离能力
+        后续调用直接拒绝 (server_calls 不增加)。隔离不消耗已签发审批的额度。
+        """
+        if tool in self._quarantined:
+            return self._typed_write_error(
+                entry, W.ERROR_CAPABILITY_QUARANTINED, f"quarantined:{tool}")
+        ok, reason = self._catalog.verify(tool)
+        if not ok:
+            self._quarantined.add(tool)
+            self.security_events.append({
+                "run_id": entry.get("run_id"),
+                "server_identity": W.SERVER_IDENTITY,
+                "violation": f"capability_quarantined:{tool}:{reason}",
+            })
+            return self._typed_write_error(
+                entry, W.ERROR_CAPABILITY_QUARANTINED,
+                f"capability_descriptor_mismatch:{tool}:{reason}")
+        return None
+
+    def inject_rogue_descriptor(self, tool: str, descriptor: dict) -> None:
+        """夹具/工作台: 模拟 Server 目录未经评审的变化 (A-02 描述篡改 / A-05 版本+schema 变化)。"""
+        self._catalog.register(tool, descriptor)
+
+    def restore_capability(self, tool: str) -> None:
+        """解除隔离并恢复冻结描述 (教学演示的人工解冻; 真实系统须评审流程)。"""
+        self._quarantined.discard(tool)
+        self._catalog.restore(tool)
+
+    def capability_status(self) -> dict:
+        """工具能力状态面板 (工具 -> 是否隔离 / served 是否与冻结清单一致)。"""
+        status = {}
+        for tool in ALLOWED_TOOLS:
+            ok, reason = self._catalog.verify(tool)
+            status[tool] = {
+                "quarantined": tool in self._quarantined,
+                "served_matches_manifest": ok,
+                "reason": reason,
+            }
+        return status
+
+    # ---- A-06: 写后断连 -> result_unknown -> 先查后说 (恢复第一动作是查询) ----
+
+    @staticmethod
+    def _pending_envelope(key: str) -> dict:
+        return {
+            "status": W.STATUS_RECONCILIATION_PENDING,
+            "tool_version": W.TOOL_VERSION,
+            "effect": W.EFFECT,
+            "idempotency_key": key,
+            "message": W.RECONCILIATION_PENDING_MESSAGE,
+        }
+
+    def _reconcile_lookup(self, run_id: str):
+        """按幂等键先查后说: 查询外部事实并独立核验; 绝不调用创建。
+
+        返回 (envelope, reason_typed); envelope ∈ action_completed
+        (recovered_from=result_unknown) / reconciliation_pending (查询不可用/
+        未查到/核验失败 —— 外部事实不足, 保持未知, 禁止伪造终态)。
+        """
+        key = W.idempotency_key(run_id)
+        try:
+            ticket_id = self._ticket_service.find_id_by_idempotency_key(key)
+        except QueryUnavailableError:
+            return self._pending_envelope(key), "reconciliation_query_unavailable"
+        if ticket_id is None:
+            return self._pending_envelope(key), "reconciliation_ticket_not_found"
+        verified = self._ticket_service.get_ticket(ticket_id)
+        if verified is None or verified.get("ticket_id") != ticket_id:
+            return self._pending_envelope(key), "reconciliation_verify_failed"
+        self._ticket_service.mark_reconciled(
+            ticket_id, run_id=run_id, at=self._clock())
+        envelope = {
+            "status": W.STATUS_COMPLETED,
+            "tool_version": W.TOOL_VERSION,
+            "effect": W.EFFECT,
+            "ticket_id": ticket_id,
+            "idempotency_key": key,
+            "ticket_state": verified["state"],
+            "verified_by": "ticket.get",
+            "recovered_from": W.STATUS_UNKNOWN,
+            "external_ticket_count": self._ticket_service.ticket_count(),
+        }
+        return envelope, f"reconciled_from_result_unknown:{ticket_id}"
+
+    def _after_response_lost(self, entry: dict, run_id: str, before: int) -> dict:
+        """ResponseLostError 捕获后的编排: result_unknown -> 对账 -> 终态或保持待对账。
+
+        顺序 (合同 v2): write_requested -> connection_lost -> result_unknown
+        -> query_by_idempotency_key -> (found -> action_completed | 否则 pending)。
+        """
+        entry["outcome"] = W.STATUS_UNKNOWN
+        entry["reason_typed"] = "connection_lost_after_commit"
+        delta = self._ticket_service.ticket_count() - before  # 已提交但未核验
+        envelope, reason = self._reconcile_lookup(run_id)
+        if envelope["status"] == W.STATUS_COMPLETED:
+            if (delta not in (0, 1)
+                    or envelope.get("verified_by") != "ticket.get"
+                    or envelope.get("idempotency_key") != W.idempotency_key(run_id)):
+                self.security_events.append({
+                    "run_id": entry["run_id"],
+                    "server_identity": W.SERVER_IDENTITY,
+                    "violation": "reconciled_envelope_out_of_contract",
+                })
+                return self._typed_write_error(
+                    entry, W.ERROR_CONTRACT_VIOLATION,
+                    "reconciled_envelope_out_of_contract")
+            entry["outcome"] = W.STATUS_COMPLETED
+            entry["reason_typed"] = f"connection_lost_after_commit->{reason}"
+            entry["external_write_effects"] = delta
+            self.external_write_effects += delta
+            return envelope
+        # 查询也不可用 / 未查到: 停在 reconciliation_pending, 禁止伪造终态
+        entry["outcome"] = W.STATUS_RECONCILIATION_PENDING
+        entry["reason_typed"] = f"connection_lost_after_commit->{reason}"
+        entry["external_write_effects"] = delta
+        self.external_write_effects += delta
+        return envelope
+
+    def reconcile(self, run_id: str) -> dict:
+        """人工/编排对账入口 (恢复第一动作永远是查询, 不是再次创建)。
+
+        只读幂等键查询 + ticket.get 独立核验 + 追加 reconciled 事件 (同 run 幂等);
+        对账本身零外部效果 (效果增量 != 0 -> contract_violation)。
+        """
+        entry = {
+            "run_id": run_id,
+            "tool": "ticket.reconcile",
+            "caller": self.session.as_dict(),
+            "approval_id": None,
+            "outcome": None,
+            "reason_typed": None,
+            "external_write_effects": 0,
+        }
+        self.audit.append(entry)
+        before = self._ticket_service.ticket_count()
+        envelope, reason = self._reconcile_lookup(run_id)
+        delta = self._ticket_service.ticket_count() - before
+        if envelope["status"] == W.STATUS_COMPLETED:
+            if delta != 0:
+                self.security_events.append({
+                    "run_id": entry["run_id"],
+                    "server_identity": W.SERVER_IDENTITY,
+                    "violation": f"reconcile_with_effects:{delta}",
+                })
+                return self._typed_write_error(
+                    entry, W.ERROR_CONTRACT_VIOLATION,
+                    f"reconcile_with_effects:{delta}")
+            entry["outcome"] = W.STATUS_COMPLETED
+            entry["reason_typed"] = reason
+            return envelope
+        entry["outcome"] = W.STATUS_RECONCILIATION_PENDING
+        entry["reason_typed"] = reason
         return envelope

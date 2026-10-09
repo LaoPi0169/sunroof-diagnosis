@@ -632,6 +632,78 @@ week-14/business-user-test-script-v1.md          # 业务用户逐步测试脚�
 文件入列，凭据/政策正文仍零出现）。会话为单用户教学模拟（固定客服周宁），审批/
 审计面板属 restricted 审计面（含批准载荷），仅回显给本人、不写日志文件。
 
+### 第 15 周：攻击、撤销并恢复受控动作（对抗 + 撤销 + 断连对账 + 运营补偿）
+
+依据 `specs/business-background.md` 3438-3665，用同一张复核单（NS-1042）重演
+「七步攻击」：恶意文档伪装指令（A-01）、工具描述自称 always authorized（A-02）、
+参数走私（A-03）、审批后执行前撤销（A-04）、工具/schema 版本变化（A-05）、写后
+断连（A-06）、运营补偿取消（A-07）。核心机制（全部落在确定性组件，不靠提示词）：
+
+- **能力清单门**（`mcptool/capability_manifest.py`）：served 工具描述/参数模式与
+  冻结清单 `week-15/mcp-capability-manifest-v2.json` 的 canonical-json 摘要逐字节
+  等值比对，不符 → `capability_quarantined` 隔离 + 安全事件（server_calls 不增加，
+  审批额度不消耗）；清单文件字节级 sha256 与代码常量互锁，被改 → 装载即失败
+  （fail closed）。文本永远不能创建身份、权限或审批——比对是摘要等值，不做
+  「像不像命令」的语义判断。
+- **执行前撤销**（`approval.py revoke`）：追加式——原记录与绑定字段全保留，
+  decision 变 `revoked` 并记撤销人/时刻/原因；仅未使用批准可撤销；server 执行前
+  重读当前状态 → `approval_revoked`（前端显示「已批准」不算数）。
+- **写后断连对账**（`client.py` 编排）：`ticket_service` 断连注入缝在提交成功后
+  抛 `ResponseLostError` → Host 进入 `result_unknown` → **先按幂等键查询外部事实**
+  （恢复第一动作永远是查询，不是再次创建）→ 查到且 `ticket.get` 独立核验通过 →
+  `action_completed`（`recovered_from=result_unknown`，追加 `reconciled` 事件）；
+  查询不可用/未查到 → 停 `reconciliation_pending`，不伪造终态、不盲重试。查询
+  不可用期间的创建本身 fail-closed 拒绝（0 效果）。`reconcile(run_id)` 为只读
+  对账入口，效果增量 ≠ 0 即 contract_violation。
+- **运营补偿**（`ticket_service.cancel_ticket`）：仅 `ops_admin`；不在模型工具
+  目录/Host 允许列表（`ticket.cancel` 不存在）；取消只改 state 并追加事件链
+  （`created → [response_lost → reconciled] → cancellation_approved → cancelled`），
+  幂等表与原工单保留——补偿不删除历史。
+- 合同 v2（`week-15/ticket-write-contract-v2.json`，sha256 `f9afabdc…e931f4` 与
+  代码常量互锁）：错误八类 → **十类**（+`approval_revoked`、`capability_quarantined`），
+  终态补 `approval_revoked`/`result_unknown`/`reconciliation_pending`；
+  **week-14 v1 冻结物一字节不动**（摘要 `486b9362…b1b9b4` 由测试锁定）。
+
+```
+week-15/ticket-write-contract-v2.json            # 封闭写合同 v2（撤销/清单门/对账/补偿；sha256 与代码互锁）
+week-15/mcp-capability-manifest-v2.json          # 能力冻结清单 v2（4 工具描述+schema 摘要；隔离策略；补偿排除项）
+week-15/business-user-test-script-v1.md          # 业务用户逐步测试脚本（T-00..T-12, A-01..A-07）
+mcptool/capability_manifest.py                   # 清单装载(sha 互锁) + served 目录 + 摘要比对
+mcptool/write_contract.py                        # 扩展: 状态 result_unknown/reconciliation_pending + 错误十类
+mcptool/approval.py                              # 扩展: revoke（追加式, 仅未使用批准可撤销）
+mcptool/ticket_service.py                        # 扩展: 事件链/断连缝/查询不可用缝/cancel_ticket(ops_admin)
+mcptool/server.py                                # 扩展: 撤销门 + fail_after_commit 透传 + 幂等查询不可用防御
+mcptool/client.py                                # 扩展: 能力清单门 + result_unknown 对账编排 + reconcile()
+workbench_adversarial/app.py                     # 对抗工作台薄壳: 七张攻击卡一键重演 + 手动撤销/断连/对账/取消
+workbench_adversarial/static/index.html          # 中文前台页面（原生 HTML/JS, 零依赖零构建）
+start_workbench_adversarial.bat                  # 交付人双击启动（端口 8015, 自动打开浏览器）
+tests/test_mcp_adversarial.py                    # 12 个对抗用例（全量 82 -> 94）
+```
+
+### 第 15 周验证方式
+
+```powershell
+# 业务用户交互工作台（无命令行测试入口）
+start_workbench_adversarial.bat          # 双击启动, 打开 http://127.0.0.1:8015
+
+# 对抗测试（合同/清单互锁 + A-01..A-07 + 断连对账 + 运营补偿 + 工作台端到端 + 脱敏）
+python -m unittest tests.test_mcp_adversarial -v
+```
+
+### 第 15 周结果要点与边界（诚实不夸大）
+
+对抗用例 12/12：A-01..A-07 攻击面外部效果恒 0（A-06 断连恰 1 且不重复）；
+A-02/A-05 隔离事件入安全事件且 server_calls 不增加；撤销后执行 0 效果、撤销
+元数据只进受限审计；查询不可用时对账停 `reconciliation_pending` 且不泄露工单
+存在性；运营取消保留完整事件链。工作台 `workbench_adversarial/` 七张攻击卡
+一键重演（自动重置沙盒、逐步展示「输入/允许/外部状态」），手动面板支持自由
+组合撤销/断连/对账/取消；全量 82 → 94 全绿；`ci/redaction_scan.py` SCOPE_FILES
+36 → 39（capability_manifest 与对抗工作台 3 个运行时文件入列，零违规）。
+不增加模型可调用工具（仍 1 读 + 3 写）；不宣称真实工单系统安全；阻断这 7 类
+课程攻击不等价于「系统已安全」。威胁模型 v2 / 审批策略 v2 / 对抗逐例报告 /
+effect-audit jsonl / runbook / decision-memo-04 六份周文档另行交付。
+
+
 
 
 

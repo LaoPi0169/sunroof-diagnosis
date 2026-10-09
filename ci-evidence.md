@@ -288,4 +288,46 @@ CI RESULT OK | duration=28.5s
 - 一致性门复验：第 8 周动态发现测试数（82）已同步进 README；baseline jsonl
   行尾搅动本轮再触发一次，`git restore` 未入库。
 
+## 十一、Week 15 CI 运行证据（2026-10-09，攻击·撤销·恢复）
+
+```
+CI RUN 2026-10-09T02:05:20+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 94 tests in 25.141s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=39, emissions_checked=53, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=63017; smokes_passed=4/4
+CI RESULT OK | duration=27.7s
+```
+
+证据日志：`evidence/ci-run-w15.log`（新增独立文件，未追加 w14/w14-workbench/w08 历史）。
+
+Week 15 变化点（交付物见 README「第 15 周：攻击、撤销并恢复受控动作」小节）：
+
+- STAGE-2 全量测试 82 → 94（新增 `tests/test_mcp_adversarial.py` 12 个用例：
+  合同 v2/能力清单 v2 sha256 互锁 + week-14 v1 冻结物一字节不动 / A-01 恶意文档
+  文本只是数据 / A-02 工具描述自称授权 → capability_quarantined 隔离且
+  server_calls=0、审批额度不消耗 / A-03 参数走私止于 Host 层 / A-04 执行前撤销
+  → approval_revoked / A-05 未评审 @2 版本隔离不自动升级 + notify_customer 走私
+  schema 拒绝 / A-06 断连 result_unknown → 先查后说 → action_completed 恰 1 效果
+  + 事件链 created→response_lost→reconciled / 查询不可用停 reconciliation_pending
+  禁止伪造终态 + 创建 fail-closed 拒绝 / A-07 补偿仅 ops_admin 且 append-only /
+  工作台七张攻击卡端到端 + 手动撤销/断连/取消角色矩阵 / 脱敏与 manifest fail-closed）。
+- STAGE-3 扫描范围 36 → 39 文件：`mcptool/capability_manifest.py` 与
+  `workbench_adversarial/__init__.py`、`workbench_adversarial/app.py` 入列；
+  53 个输出点零违规（凭据与政策正文零出现；与第 12-14 周同口径）。
+  **restricted 载荷边界**：批准载荷（approved_parameters）与撤销元数据
+  （revoked_by/revoked_at/revoke_reason）只存审批记录（restricted 面板回显本人），
+  用户面封套与攻击卡步骤叙述经 test_11 断言不含这些键。
+- 工具层证据：`week-15/ticket-write-contract-v2.json` 先冻结（sha256
+  `f9afabdc…e931f4`，与 `write_contract.CONTRACT_SHA256` 常量互锁；错误八类 →
+  十类）；`week-15/mcp-capability-manifest-v2.json` 先冻结（sha256 `136efe01…a8a918`，
+  与 `capability_manifest.MANIFEST_SHA256` 互锁，清单被改 → 装载即失败）。
+  A-01..A-05/A-07 攻击面外部效果恒 0；A-06 断连先查后说恢复，外部工单总数恰 1；
+  撤销/隔离/对账细分原因只进受限审计。
+- 第 12/13/14 周冻结物零改动：week-14 v1 合同 sha256 `486b9362…b1b9b4` 由
+  test_01 锁定；只读库 16 工单快照、13 种子回归、RAG 冻结物均不受扰
+  （94 测试含全部既有冻结对账用例全绿；全量与 CI 各触发一次 baseline jsonl
+  行尾搅动，均按既有口径 `git restore`，未入库）。
+
+
 

@@ -5,13 +5,15 @@
 (reason_typed) 只进受限审计, 用户面文案统一安全 —— 不存在/跨租户/角色不可见
 三种拒绝的用户面响应逐字节一致 (不暴露对象存在性)。
 
-写路径 (ticket.preview_create / ticket.create / ticket.get, Week 14):
+写路径 (ticket.preview_create / ticket.create / ticket.get, Week 14/15):
   - preview_create 物理隔离: 不调用 ticket_service 任何写方法, 只读外部计数;
-  - create 执行前重读当前审批逐项比对 (绑定字段 + 执行时策略再判定),
+  - create 执行前重读当前审批逐项比对 (撤销/绑定字段 + 执行时策略再判定),
     不信任预览缓存; 幂等键先于消耗额度查重放; 写后用 ticket.get 语义独立核验;
+    fail_after_commit=True 为 A-06 断连夹具: 提交成功后响应丢失 (对账在 Host 侧);
   - get_ticket 对写 store 的只读核验查询 (不存在/跨租户一律 not_available)。
 
 rogue_mode 仅供夹具模拟「失控服务端」(超合同结果 / 版本漂移), 正常路径恒为 None。
+result_unknown 编排 (先查后说, 禁止伪造终态) 在 Host 侧 client.py 实现。
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ import time
 from . import case_store
 from . import contract as C
 from . import write_contract as W
+from .ticket_service import QueryUnavailableError
 
 
 def _error(code: str) -> dict:
@@ -139,11 +142,14 @@ def preview_create(arguments, session, *, now, ticket_service, policy,
 
 
 def create(arguments, session, *, now, run_id, approval_id, approval_service,
-           ticket_service, policy, rag_terminal=None, rogue_mode=None):
+           ticket_service, policy, rag_terminal=None, rogue_mode=None,
+           fail_after_commit=False):
     """执行前再授权 -> 幂等写入 -> 独立核验; 唯一产生外部效果的函数。
 
-    执行器不接受「模型说用户已经同意」: 重新读取当前审批 (status_now),
+    执行器不接受「模型说用户已经同意」: 重新读取当前审批 (status_now, 含撤销),
     逐项比对绑定字段, 再做执行时策略判定; 幂等键先于消耗额度查重放。
+    fail_after_commit=True (A-06 夹具): 提交成功后抛 ResponseLostError 模拟断连 ——
+    工单已创建但本函数永不返回结果; 恢复由 Host 按幂等键先查后说。
     """
     canonical, err = W.validate_write_arguments(arguments)
     if err:
@@ -160,6 +166,10 @@ def create(arguments, session, *, now, run_id, approval_id, approval_service,
         return _write_error(W.ERROR_APPROVAL_REQUIRED), "approval_not_found"
     if status == "denied":
         return _write_error(W.ERROR_APPROVAL_REQUIRED), "approval_decision_denied"
+    if status == "revoked":
+        # 第 15 周 A-04: 执行前撤销 —— 前端显示「已批准」不算数,
+        # 执行时重读的服务端审批状态才是当前事实。
+        return _write_error(W.ERROR_APPROVAL_REVOKED), "approval_revoked_before_execute"
     if status == "expired":
         return _write_error(W.ERROR_APPROVAL_EXPIRED), "approval_expired"
     # 注意: exhausted 不在此处拦截 —— 幂等重放检查 (步骤 4) 须先于用尽检查,
@@ -191,7 +201,11 @@ def create(arguments, session, *, now, run_id, approval_id, approval_service,
 
     # -- 4) 幂等键重放检查 (先于消耗额度; 重放不产生新效果) --
     key = W.idempotency_key(run_id)
-    existing_id = ticket_service.find_id_by_idempotency_key(key)
+    try:
+        existing_id = ticket_service.find_id_by_idempotency_key(key)
+    except QueryUnavailableError:
+        # A-06 第二段: 连重放查重都做不了 -> not_available (结果未确认, 不盲重试)
+        return _write_error(W.ERROR_NOT_AVAILABLE), "idempotency_query_unavailable"
     if existing_id is not None:
         verified = ticket_service.get_ticket(existing_id)
         envelope = {
@@ -214,13 +228,13 @@ def create(arguments, session, *, now, run_id, approval_id, approval_service,
     if not approval_service.consume(approval_id):
         return _write_error(W.ERROR_APPROVAL_REQUIRED), "approval_exhausted"
 
-    # -- 6) 带幂等键写入隔离模拟服务 --
+    # -- 6) 带幂等键写入隔离模拟服务 (A-06 断连缝: 提交成功后响应可丢失) --
     ticket_id, _created = ticket_service.create_review_ticket(
         case_id=canonical["case_id"], reason_code=canonical["reason_code"],
         source_refs=canonical["source_refs"],
         target_queue=canonical["target_queue"], idempotency_key=key,
         requested_by=session.user_id, tenant_id=session.tenant_id,
-        created_at=now)
+        created_at=now, inject_response_loss=fail_after_commit)
 
     # -- 7) 独立核验: 完成由外部状态证明, 不由写返回值/模型宣称证明 --
     verified = ticket_service.get_ticket(ticket_id)

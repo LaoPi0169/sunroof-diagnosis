@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>攻击 · 撤销 · 恢复 · 对抗测试工作台</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#c0392b; --warn:#b7791f; --muted:#8a94a6;
+          --line:#dde3ec; --bg:#f5f7fb; --card:#ffffff; --ink:#1c2733; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:#12263f; color:#fff; padding:14px 22px; }
+  header h1 { font-size:18px; margin:0 0 6px; }
+  #run-bar { font-size:13px; color:#c9d6e8; }
+  #run-bar code { background:#1d3a5f; padding:2px 6px; border-radius:4px; }
+  #btn-reset { float:right; background:#2c4a73; color:#fff; border:1px solid #4a6b99;
+               border-radius:6px; padding:4px 12px; cursor:pointer; }
+  main.grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+              gap:16px; padding:16px 22px; max-width:1380px; margin:0 auto; }
+  @media (max-width: 1000px) { main.grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:4px 0 10px; line-height:1.6; }
+  button { font-size:14px; padding:8px 16px; border-radius:8px; cursor:pointer;
+           border:1px solid var(--line); background:#eef2f8; }
+  button.primary { background:#1a5fb4; border-color:#1a5fb4; color:#fff; }
+  button.danger  { background:#fff; border-color:#c0392b; color:#c0392b; }
+  button.warn    { background:#fff; border-color:#b7791f; color:#b7791f; }
+  button.atk { width:100%; text-align:left; margin:4px 0; font-size:13.5px; }
+  .row { display:flex; gap:10px; margin-bottom:8px; align-items:center; flex-wrap:wrap; }
+  label { display:block; font-size:13px; margin:8px 0 3px; }
+  input, select { width:100%; padding:7px 10px; border:1px solid var(--line);
+                  border-radius:6px; font-size:13px; font-family:Consolas, monospace; }
+  code { background:#eef2f8; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .verdict { padding:9px 12px; border-radius:8px; font-size:13.5px; margin:8px 0; }
+  .verdict.ok   { background:#e8f5ec; color:var(--ok); border:1px solid #bfe3c9; }
+  .verdict.bad  { background:#fdecea; color:var(--bad); border:1px solid #f5c6c0; }
+  .verdict.warn { background:#fdf6e7; color:var(--warn); border:1px solid #f0dcae; }
+  .verdict.info { background:#eef2f8; color:#1c2733; border:1px solid var(--line); }
+  table.params { border-collapse:collapse; width:100%; font-size:12.5px; margin:6px 0; }
+  table.params th, table.params td { border:1px solid var(--line); padding:4px 8px;
+                                     text-align:left; word-break:break-all; }
+  table.params th { background:#f2f6fc; width:150px; }
+  details { margin-top:6px; }
+  details summary { cursor:pointer; font-size:12.5px; color:var(--muted); }
+  pre { background:#12263f; color:#d7e4f5; padding:10px; border-radius:8px;
+        font-size:11.5px; overflow:auto; max-height:340px; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .ticket { border:1px solid var(--line); border-radius:8px; padding:7px 10px;
+            font-size:12.5px; margin:6px 0; background:#fbfcfe; }
+  .audit { max-height:380px; overflow:auto; }
+  .audit-line { font-size:12.5px; padding:4px 6px; border-bottom:1px dashed var(--line);
+                word-break:break-all; }
+  .audit-line .idx { display:inline-block; min-width:20px; color:var(--muted); }
+  .fx { color:var(--ok); }
+  .stat { display:inline-block; margin-right:14px; font-size:13.5px; }
+  .stat b { font-size:16px; }
+  .step { border-left:3px solid var(--line); margin:6px 0; padding:4px 10px; font-size:13px; }
+  .step b.res { font-family:Consolas, monospace; font-size:12.5px; }
+  .step .det { color:var(--muted); font-size:12px; }
+  .badge { display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:10px;
+           margin-left:6px; border:1px solid var(--line); background:#f2f6fc; }
+  .badge.on { background:#fdecea; border-color:#f5c6c0; color:var(--bad); }
+  .cap-ok  { color:var(--ok); }
+  .cap-bad { color:var(--bad); font-weight:bold; }
+</style>
+</head>
+<body>
+<header>
+  <button id="btn-reset">重置演示环境</button>
+  <h1>攻击 · 撤销 · 恢复 —— 受控动作对抗测试工作台（第 15 周交付）</h1>
+  <div id="run-bar">本次运行 run_id: <code id="run-id">—</code> · 幂等键: <code id="idem-key">—</code> ·
+    会话: 客服 周宁（教学模拟） · 运营补偿角色: <code id="ops-role">ops_admin</code></div>
+</header>
+<main class="grid">
+  <section class="left">
+    <div class="card">
+      <h2>业务场景（与第 14 周同一张复核单）</h2>
+      <p style="font-size:13.5px; line-height:1.7; margin:4px 0;">
+        客服 <b>周宁</b> 处理工单 <b>NS-1042</b>（政策冲突，RAG 终态 escalate）。
+        第 14 周已证明「写必须精确审批」；本周证明：<b>文档、工具描述、工具结果、参数、
+        连接状态都不可信时，系统仍只有一条确定性效果路径</b> —— 审批可被撤销、
+        断连先对账、补偿只归运营。全部效果只发生在<b>隔离模拟工单服务</b>。</p>
+    </div>
+
+    <div class="card">
+      <h2>手动面板 · 撤销 / 断连 / 对账 / 运营取消</h2>
+      <p class="hint">自由组合演练：预览 → 批准 → <b>撤销</b> → 执行（观察撤销是否生效）；
+        或批准后布防<b>断连注入</b>再执行，然后点<b>对账</b>。注入缝只作用于本地沙盒。</p>
+      <div class="row">
+        <button id="btn-preview" class="primary">生成预览</button>
+        <button id="btn-approve" class="primary">批准</button>
+        <button id="btn-deny">拒绝</button>
+        <button id="btn-revoke" class="danger">撤销审批 (A-04)</button>
+      </div>
+      <div class="row">
+        <button id="btn-arm-loss" class="warn">布防断连注入 (一次性)</button>
+        <button id="btn-outage" class="warn">切换: 对账查询不可用</button>
+        <button id="btn-reconcile" class="primary">对账 (先查后说)</button>
+      </div>
+      <div class="row">
+        <button id="btn-rogue-desc" class="warn">注入: 工具描述自称已授权 (A-02)</button>
+        <button id="btn-rogue-v2" class="warn">注入: 未经评审的 @2 版本 (A-05)</button>
+        <button id="btn-restore">人工恢复工具描述</button>
+      </div>
+      <label>运营补偿 · 取消工单（补偿接口不在模型工具目录）</label>
+      <div class="row">
+        <input id="cancel-id" style="flex:0 0 160px;" placeholder="工单号 SIM-5001">
+        <select id="cancel-role" style="flex:0 0 190px;">
+          <option value="ops_admin">ops_admin（运营）</option>
+          <option value="support_agent">support_agent（一线, 应被拒）</option>
+        </select>
+        <button id="btn-cancel" class="danger">取消工单 (A-07)</button>
+      </div>
+      <div id="result-manual"></div>
+    </div>
+
+    <div class="card">
+      <h2>七张攻击卡 · 一键重演（每次运行自动重置沙盒）</h2>
+      <p class="hint">每张卡逐步展示四层证据：输入内容 → 系统允许了什么 → 外部效果计数。
+        运行后可在右侧「受限审计链」核对细分原因（restricted）。</p>
+      <button class="atk" id="atk-A-01" data-attack="A-01">A-01 · 文档假装自己是系统指令</button>
+      <button class="atk" id="atk-A-02" data-attack="A-02">A-02 · 工具描述自称 always authorized</button>
+      <button class="atk" id="atk-A-03" data-attack="A-03">A-03 · 参数走私（未知字段 + 嵌套元数据）</button>
+      <button class="atk" id="atk-A-04" data-attack="A-04">A-04 · 审批后、执行前撤销</button>
+      <button class="atk" id="atk-A-05" data-attack="A-05">A-05 · 工具/schema 版本变化（ticket.create@2）</button>
+      <button class="atk" id="atk-A-06" data-attack="A-06">A-06 · 写入完成后连接断开</button>
+      <button class="atk" id="atk-A-07" data-attack="A-07">A-07 · 观察受控补偿（运营取消）</button>
+      <div id="result-attack"></div>
+    </div>
+
+    <div class="card">
+      <h2>正向 sanity · 预览 / 批准 / 执行 / 核验</h2>
+      <p class="hint">与第 14 周工作台同口径：不改字段执行 = 幂等重放；改字段执行 = 绑定比对拦截。</p>
+      <label>工单号 case_id</label><input id="f-case">
+      <label>原因代码 reason_code</label><input id="f-reason">
+      <label>引用来源 source_refs（逗号分隔）</label><input id="f-refs">
+      <label>目标队列 target_queue</label><input id="f-queue">
+      <div class="row" style="margin-top:10px;">
+        <button id="btn-execute" class="primary">按当前审批执行</button>
+        <input id="verify-id" style="flex:1;" placeholder="工单号，如 SIM-5001">
+        <button id="btn-verify">查询工单</button>
+      </div>
+      <div id="result-execute"></div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="card">
+      <h2>外部状态（唯一可信证据）</h2>
+      <div>
+        <span class="stat">模拟工单总数 <b id="ticket-total">0</b></span>
+        <span class="stat">累计外部效果 <b id="effects">0</b></span>
+        <span class="stat">安全事件 <b id="secevents">0</b></span>
+      </div>
+      <div id="inject-badges"></div>
+      <div id="ticket-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>当前审批状态 <span class="muted">（restricted）</span></h2>
+      <div id="approval-panel"><p class="muted">尚未做出决定</p></div>
+    </div>
+
+    <div class="card">
+      <h2>工具能力状态（冻结清单比对）</h2>
+      <div id="capability-panel"><p class="muted">（加载中）</p></div>
+    </div>
+
+    <div class="card">
+      <h2>受限审计链 <span class="muted">（restricted）</span></h2>
+      <div id="audit-panel" class="audit"><p class="muted">（空）</p></div>
+    </div>
+  </aside>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path, payload) {
+  const opt = payload === undefined ? {} : {
+    method: "POST",
+    headers: {"Content-Type": "application/json; charset=utf-8"},
+    body: JSON.stringify(payload),
+  };
+  const resp = await fetch(path, opt);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw data;
+  return data;
+}
+
+function formValues() {
+  return { case_id: $("f-case").value, reason_code: $("f-reason").value,
+           source_refs: $("f-refs").value, target_queue: $("f-queue").value };
+}
+function setForm(form) {
+  $("f-case").value = form.case_id; $("f-reason").value = form.reason_code;
+  $("f-refs").value = form.source_refs; $("f-queue").value = form.target_queue;
+}
+
+function verdict(envelope) {
+  const s = envelope.status;
+  if (s === "action_preview") return {cls:"ok", text:"预览成功：外部效果 0（工单总数不变）"};
+  if (s === "action_completed")
+    return {cls:"ok", text:"完成：" + (envelope.recovered_from ?
+      "（对账恢复，recovered_from=" + envelope.recovered_from + "）" : "") +
+      "已确认 " + envelope.ticket_id + "（verified_by=" + envelope.verified_by + " 独立核验）"};
+  if (s === "approval_denied")
+    return {cls:"warn", text:"策略拒绝（approval_denied 是正常安全终态，外部效果 0）"};
+  if (s === "reconciliation_pending")
+    return {cls:"warn", text:"对账未完成：" + (envelope.message || "外部事实未确认 —— 禁止伪造终态、不要重试创建")};
+  if (s === "result_unknown")
+    return {cls:"warn", text:"结果未知（连接断开）—— 系统将先按幂等键查询对账"};
+  if (s === "ok")
+    return {cls:"ok", text:"查询成功：" + envelope.records.length + " 条记录（只读，外部效果 0）"};
+  if (s === "error")
+    return {cls:"bad", text:"被拦截：" + envelope.error.code + " —— " + envelope.error.message};
+  return {cls:"info", text:"状态：" + s};
+}
+
+function recordTable(records) {
+  return records.map((r) => "<table class='params'>" +
+    Object.keys(r).map((k) => "<tr><th>" + esc(k) + "</th><td><code>" + esc(JSON.stringify(r[k])) + "</code></td></tr>").join("") +
+    "</table>").join("");
+}
+
+function showResult(id, envelope, state) {
+  const v = verdict(envelope);
+  let html = "<div class='verdict " + v.cls + "'>" + esc(v.text) + "</div>";
+  if (envelope.canonical_parameters) {
+    const c = envelope.canonical_parameters;
+    html += "<table class='params'>" +
+      ["case_id","reason_code","source_refs","target_queue"].map((k) =>
+        "<tr><th>" + k + "</th><td><code>" + esc(JSON.stringify(c[k])) + "</code></td></tr>").join("") +
+      "</table>";
+  }
+  if (envelope.records) html += recordTable(envelope.records);
+  html += "<details><summary>原始返回 JSON</summary><pre>" +
+          esc(JSON.stringify(envelope, null, 2)) + "</pre></details>";
+  $(id).innerHTML = html;
+  renderState(state);
+}
+
+function showErr(id, err) {
+  $(id).innerHTML = "<div class='verdict bad'>请求失败：" +
+    esc(err.detail || err.error || JSON.stringify(err)) + "</div>";
+}
+
+function renderState(state) {
+  $("run-id").textContent = state.run_id;
+  $("idem-key").textContent = state.idempotency_key;
+  $("ops-role").textContent = state.ops_cancel_role;
+  $("ticket-total").textContent = state.ticket_total;
+  $("effects").textContent = state.external_write_effects;
+  $("secevents").textContent = state.security_events.length;
+  let badges = "";
+  if (state.inject_response_loss_armed)
+    badges += "<span class='badge on'>断连注入已布防 (一次性)</span>";
+  if (state.query_outage)
+    badges += "<span class='badge on'>对账查询不可用</span>";
+  $("inject-badges").innerHTML = badges;
+
+  const tl = $("ticket-list");
+  tl.innerHTML = state.tickets.length ? state.tickets.map((t) => {
+    const ev = (t.events || []).map((e) => esc(e.event)).join(" → ");
+    return "<div class='ticket'><b>" + esc(t.ticket_id) + "</b>（" + esc(t.state) +
+      "）· 工单 " + esc(t.case_id) + " · 队列 <code>" + esc(t.target_queue) + "</code>" +
+      "<br><span class='muted'>事件链: " + (ev || "—") + "</span></div>";
+  }).join("") : "<p class='muted'>（空 —— 没有任何工单被创建）</p>";
+
+  const p = $("approval-panel");
+  if (!state.decision_id) p.innerHTML = "<p class='muted'>尚未做出决定</p>";
+  else {
+    const r = state.decision_record_restricted || {};
+    const eff = state.decision_effective_status;
+    const effCls = eff === "approved" ? "ok" : (eff === "denied" ? "warn" : "bad");
+    let html = "<p style='font-size:13px; margin:4px 0;'>记录 ID: <code>" + esc(state.decision_id) +
+      "</code><br>决定: <b>" + esc(r.decision || state.decision) +
+      "</b> · 当前有效状态: <b class='" + effCls + "'>" + esc(eff) + "</b></p>";
+    if (r.maximum_uses !== undefined)
+      html += "<p style='font-size:13px; margin:4px 0;'>使用额度: " + r.uses + " / " + r.maximum_uses + "</p>";
+    if (r.revoked_at)
+      html += "<p style='font-size:13px; margin:4px 0;'>撤销于 <code>" + esc(r.revoked_at) +
+              "</code> · 撤销人 <code>" + esc(r.revoked_by) + "</code><br>原因: " + esc(r.revoke_reason) + "</p>";
+    p.innerHTML = html;
+  }
+
+  const caps = state.capabilities || {};
+  $("capability-panel").innerHTML = Object.keys(caps).map((tool) => {
+    const c = caps[tool];
+    const bad = c.quarantined || !c.served_matches_manifest;
+    return "<div class='audit-line'><span class='" + (bad ? "cap-bad" : "cap-ok") + "'>" +
+      (bad ? "[隔离]" : "[正常]") + "</span> <code>" + esc(tool) + "</code>" +
+      (bad ? " <span class='muted'>(" + esc(c.reason) + ")</span>" : "") + "</div>";
+  }).join("");
+
+  $("audit-panel").innerHTML = state.audit_restricted.length ? state.audit_restricted.map((e, i) =>
+    "<div class='audit-line'><span class='idx'>" + (i + 1) + "</span><code>" + esc(e.tool) +
+    "</code> → <b>" + esc(e.outcome) + "</b>" +
+    (e.reason_typed ? " <span class='muted'>(" + esc(e.reason_typed) + ")</span>" : "") +
+    (e.external_write_effects ? " <b class='fx'>+" + e.external_write_effects + " 外部效果</b>" : "") +
+    "</div>").join("") : "<p class='muted'>（空）</p>";
+}
+
+function showAttack(data) {
+  let html = "<div class='verdict info'><b>" + esc(data.title) + "</b> —— 逐步结果：</div>" +
+    data.steps.map((st) =>
+      "<div class='step'><b>第 " + st.step + " 步</b> · " + esc(st.action) +
+      " → <b class='res'>" + esc(st.result) + "</b>" +
+      " · 累计工单 <b>" + st.effects_after + "</b>" +
+      (st.detail ? "<br><span class='det'>" + esc(st.detail) + "</span>" : "") +
+      "</div>").join("") +
+    "<details><summary>逐步 JSON（四层证据: 输入/提议/允许/外部状态）</summary><pre>" +
+    esc(JSON.stringify(data.steps, null, 2)) + "</pre></details>";
+  $("result-attack").innerHTML = html;
+  renderState(data.state);
+}
+
+$("btn-preview").onclick = async () => {
+  try { const d = await api("/api/preview", formValues());
+        showResult("result-execute", d.envelope, d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-approve").onclick = async () => {
+  try { await api("/api/decide", {decision: "approve"});
+        $("result-manual").innerHTML = "<div class='verdict ok'>已批准（一次批准一次使用；可撤销后观察执行结果）</div>"; }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-deny").onclick = async () => {
+  try { await api("/api/decide", {decision: "deny"});
+        $("result-manual").innerHTML = "<div class='verdict warn'>已拒绝（正常安全终态；系统不会自动重问）</div>"; }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-revoke").onclick = async () => {
+  try { const d = await api("/api/revoke", {});
+        $("result-manual").innerHTML = "<div class='verdict warn'>已撤销：审批记录变为 <code>revoked</code>（追加式，历史保留）；现在执行会被 approval_revoked 拦截</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-arm-loss").onclick = async () => {
+  try { const d = await api("/api/inject", {kind: "response_loss"});
+        $("result-manual").innerHTML = "<div class='verdict warn'>" + esc(d.note) + "</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-outage").onclick = async () => {
+  try { const d = await api("/api/inject", {kind: "query_outage"});
+        $("result-manual").innerHTML = "<div class='verdict warn'>" + esc(d.note) + "</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-reconcile").onclick = async () => {
+  try { const d = await api("/api/reconcile", {});
+        showResult("result-manual", d.envelope, d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-rogue-desc").onclick = async () => {
+  try { const d = await api("/api/inject", {kind: "rogue_description"});
+        $("result-manual").innerHTML = "<div class='verdict warn'>" + esc(d.note) + "</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-rogue-v2").onclick = async () => {
+  try { const d = await api("/api/inject", {kind: "rogue_version2"});
+        $("result-manual").innerHTML = "<div class='verdict warn'>" + esc(d.note) + "</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-restore").onclick = async () => {
+  try { const d = await api("/api/inject", {kind: "restore"});
+        $("result-manual").innerHTML = "<div class='verdict ok'>" + esc(d.note) + "</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-cancel").onclick = async () => {
+  try { const d = await api("/api/cancel", {ticket_id: $("cancel-id").value,
+                                            role: $("cancel-role").value});
+        $("result-manual").innerHTML = "<div class='verdict ok'>已取消 " +
+          esc(d.record.ticket_id) + "（事件链保留: " +
+          esc(d.record.events.map((e) => e.event).join(" → ")) + "）</div>";
+        renderState(d.state); }
+  catch (e) { showErr("result-manual", e); }
+};
+$("btn-execute").onclick = async () => {
+  try { const d = await api("/api/execute", formValues());
+        showResult("result-execute", d.envelope, d.state); }
+  catch (e) { showErr("result-execute", e); }
+};
+$("btn-verify").onclick = async () => {
+  try { const d = await api("/api/verify", {ticket_id: $("verify-id").value});
+        showResult("result-execute", d.envelope, d.state); }
+  catch (e) { showErr("result-execute", e); }
+};
+document.querySelectorAll("button.atk").forEach((btn) => {
+  btn.onclick = async () => {
+    try { const d = await api("/api/attack", {attack: btn.dataset.attack});
+          showAttack(d); }
+    catch (e) { showErr("result-attack", e); }
+  };
+});
+$("btn-reset").onclick = async () => {
+  const s = await api("/api/reset", {});
+  setForm(s.form);
+  ["result-manual", "result-attack", "result-execute"].forEach((id) => { $(id).innerHTML = ""; });
+  renderState(s);
+};
+
+async function boot() {
+  const s = await api("/api/state");
+  setForm(s.form);
+  renderState(s);
+}
+boot();
+</script>
+</body>
+</html>

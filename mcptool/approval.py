@@ -71,16 +71,18 @@ class ApprovalService:
         return copy.deepcopy(record) if record is not None else None
 
     def status_now(self, approval_id, *, now):
-        """执行器在执行前重读的「当前有效状态」(不信任预览缓存)。
+        """执行器在执行前重读的「当前有效状态」(不信任预览缓存/前端显示)。
 
         返回 (record, effective_status); effective_status ∈
-        missing / denied / expired / exhausted / approved。
+        missing / denied / revoked / expired / exhausted / approved。
+        撤销 (v2) 是记录上的决定, 优先于过期判断 —— 前端显示「已批准」
+        不是当前事实, 执行时重读的服务端状态才是 (A-04)。
         """
         record = self._approvals.get(approval_id)
         if record is None:
             return None, "missing"
         if record["decision"] != "approved":
-            return copy.deepcopy(record), record["decision"]  # denied
+            return copy.deepcopy(record), record["decision"]  # denied / revoked
         if now > record["expires_at"]:
             return copy.deepcopy(record), "expired"
         if record["uses"] >= record["maximum_uses"]:
@@ -96,3 +98,23 @@ class ApprovalService:
             return False
         record["uses"] += 1
         return True
+
+    def revoke(self, approval_id, *, revoked_by, revoked_at, reason):
+        """执行前撤销 (Week 15, A-04) —— 追加式, 不删除任何历史。
+
+        仅当前 decision=approved 且未使用 (uses < maximum_uses) 的审批可撤销;
+        已使用 / 已拒绝 / 不存在的审批不可撤销 (返回 None)。撤销把 decision
+        原地改为 revoked 并追加撤销元数据 (revoked_at/revoked_by/revoke_reason);
+        签发/绑定/有效期字段保持原样, 审计仍能还原「批准过什么、被谁撤销」。
+        撤销后 status_now 立即返回 revoked, 执行器重读时得到 approval_revoked。
+        """
+        record = self._approvals.get(approval_id)
+        if record is None or record["decision"] != "approved":
+            return None
+        if record["uses"] >= record["maximum_uses"]:
+            return None
+        record["decision"] = "revoked"
+        record["revoked_at"] = revoked_at
+        record["revoked_by"] = revoked_by
+        record["revoke_reason"] = reason
+        return copy.deepcopy(record)
