@@ -480,10 +480,10 @@ class WorkbenchAdversarialApiTest(unittest.TestCase):
         ok, reason = catalog.verify(W.TOOL_CREATE)
         self.assertFalse(ok)
         self.assertEqual(reason, "descriptor_digest_mismatch")
-        # CI STAGE-3 同源扫描: 39 文件全绿
+        # CI STAGE-3 同源扫描: 44 文件全绿 (Week 16 扩容 39 -> 44)
         report = scan.scan()
         self.assertTrue(report["passed"], report["violations"])
-        self.assertGreaterEqual(report["scanned_files"], 39)
+        self.assertGreaterEqual(report["scanned_files"], 44)
 
 
 if __name__ == "__main__":
