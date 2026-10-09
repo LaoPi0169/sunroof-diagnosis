@@ -703,6 +703,87 @@ A-02/A-05 隔离事件入安全事件且 server_calls 不增加；撤销后执�
 课程攻击不等价于「系统已安全」。威胁模型 v2 / 审批策略 v2 / 对抗逐例报告 /
 effect-audit jsonl / runbook / decision-memo-04 六份周文档另行交付。
 
+## 第 16 周：离线质量金丝雀与运行期 SLI（「两种体温计」可观测性）
+
+依据 `specs/business-background.md` 3667–3888，为同一套受控系统装上**两支互不
+替代的体温计**：**离线考卷金丝雀**（定期用 60 道冻结例题重考，量「内容对不对」）
+与**运行期 SLI**（每个 task_run_id 走完记录终态，量「过程健不健康」）。核心纪律：
+两支体温计**分母永不共享、两数永不合并**；运行期信号不证明内容正确——
+NS-HOLD-06 在运行视图是正常 `answered`，在考卷视图是硬门失败（F12-01 活证据）。
+
+- **考卷金丝雀**（`mcptool/run_canary.py`）：答案键 = week-12 冻结逐例结果（60 行，
+  sha256 LF 归一对齐第 12 周记录 `5a614cda…dfed`，raw 另存作行尾搅动检测）；
+  考卷 = eval-set-v1 60 例；冻结 manifest 装载即校验四个输入 sha256（fail closed）；
+  每例重跑与冻结评测同一 `run_case`（generation/* 零改动）。通过判据 =
+  **行为与冻结基线一致**（行为漂移 0 例 + 语料卫生 0 违规 + 已知失败组合不变），
+  不是「全绿」——58/60 的 2 例失败自动指路失败登记 F12-01/F12-02/F12-04。
+- **运行期 SLI**（`mcptool/telemetry.py` + `mcptool/run_telemetry_replay.py`）：
+  九阶段 span 链（请求→身份→检索→生成→引用/策略核验→审批→MCP 调用→对账→呈现，
+  缺席段标 not_applicable 不留空洞）；内部状态→六类可见终态分类表
+  （`result_unknown`/`reconciliation_pending` **非终态**，绝不折进通过率分子）；
+  SLI = `allowed_terminal_rate` + `forbidden_effect_count`（拒/撤/失败路径携带
+  效果即合同违规，照抓不漏）+ `unconfirmed_effects`（未确认效果单独口径）。
+  每指标硬编码「分母口径/内容不正确性」警示，防止两视图被合并成一个数。
+- **两个追踪断点必须画实**：#1 RAG→策略版本链（retrieval/generation 段的
+  corpus/dataset/retriever/candidate 版本与策略段 policy_version 同链可追）；
+  #2 MCP→审批+幂等键（mcp_call 段 approval_id / `{task_run_id}:ticket.create:1`
+  / ticket_id / verified_by 可关联，O-07/O-08 对账段覆盖 A-06）。
+- **遥测脱敏合同**：普通遥测只存 状态码/错误类别/版本串/引用 ID/计数/时长；
+  `scan_spans_for_violations` 机械自检 90 段 span 零违规（扫描器对污染样本有效：
+  报键名、不回显内容）；凭据字面量检测职责仍归 STAGE-3 全范围扫描（39→44 文件）。
+- **SLO 草案 v0**（`week-16/slo-proposal-v0.md`）：5 条 SLO，除恒等硬门
+  `forbidden_effect_count = 0` 外，目标/窗口**全部 [U] 待定**——无真实流量，
+  交付的是草案与口径，不是达标声明；[U] 禁止用合成回放/考卷结果代填。
+
+```
+week-16/task-quality-canary-contract-v1.md        # 考卷金丝雀合同（分母/判据/节奏/红线）
+week-16/runtime-sli-spec-v1.md                    # 运行期 SLI 规格（终态对照表/指标口径）
+week-16/slo-proposal-v0.md                        # SLO 草案 v0（目标/窗口全部 [U]）
+week-16/trace-map-v1.md                           # 追踪断点地图（9 阶段记录面 + 两断点）
+week-16/telemetry-contract-v1.md                  # 遥测合同（允许/禁止字段 + restricted 边界）
+week-16/observability-baseline-report-v1.md       # 双视图基线报告（58/60 vs 8/10 + NS-HOLD-06）
+week-16/telemetry-redaction-test-v1.md            # 脱敏测试报告（90 span 零违规 + 扫描器有效性）
+week-16/business-user-test-script-v1.md           # 业务用户逐步测试脚本（O-00..O-06）
+week-16/canary-baseline-v1.jsonl                  # 金丝雀逐例对照基线（60 行, 只读导出）
+week-16/telemetry-span-sample-v1.jsonl            # 遥测 span 样例流（90 行, 已过脱敏扫描）
+mcptool/telemetry.py                              # 遥测与 SLI 归约（TaskTrace/终态分类/脱敏自检）
+mcptool/run_canary.py                             # 离线考卷金丝雀运行器
+mcptool/run_telemetry_replay.py                   # 合成运行期回放（O-01..O-10 固定剧本）
+workbench_observability/app.py                    # 可观测性工作台薄壳（两视图并排/追踪/脱敏/SLO）
+workbench_observability/static/index.html         # 中文前台页面（原生 HTML/JS, 零依赖零构建）
+start_workbench_observability.bat                 # 交付人双击启动（端口 8016, 自动打开浏览器）
+tests/test_telemetry_observability.py             # 12 个可观测性用例（全量 94 -> 106）
+```
+
+### 第 16 周验证方式
+
+```powershell
+# 业务用户交互工作台（无命令行测试入口）
+start_workbench_observability.bat         # 双击启动, 打开 http://127.0.0.1:8016
+
+# 离线考卷金丝雀（60 例重考; 退出码 0 = 行为与冻结基线一致）
+python -m mcptool.run_canary --out week-16/canary-baseline-v1.jsonl
+
+# 合成运行期回放（10 任务剧本 + SLI 汇总）
+python -m mcptool.run_telemetry_replay --out week-16/telemetry-span-sample-v1.jsonl
+
+# 可观测性测试（金丝雀/回放/终态表/两视图纪律/脱敏/工作台 API/SLO 诚实性）
+python -m unittest tests.test_telemetry_observability -v
+```
+
+### 第 16 周结果要点与边界（诚实不夸大）
+
+金丝雀 60 例重考 58/60 与冻结答案键一致：行为漂移 0、语料卫生违规 0、已知失败
+组合不变（NS-HOLD-06 硬门→F12-01/F12-04；NS-HOLD-08 安全侧→F12-02）；week-12
+冻结物字节级零改动（测试前后 sha 复核）。回放 10 任务 allowed_terminal_rate =
+8/10（O-08 对账待定不入分子、O-09 超时诚实失败），禁止效果 0、未确认效果 1，
+外部效果合计恰 3（两次已确认创建 + 一次待对账）；90 段 span 全链可还原且脱敏
+零违规。工作台 `workbench_observability/` 两视图并排物理分开 + 任务追踪 + 脱敏
+检查 + SLO 草案展示；全量 94 → 106 全绿；`ci/redaction_scan.py` SCOPE_FILES
+39 → 44（遥测/金丝雀/回放/工作台 5 个运行时文件入列，零违规）。**边界**：回放
+是固定剧本不是真实流量（SLO 目标全部 [U]）；金丝雀度量内容、运行期度量过程，
+两数永不合并；不宣称「系统已被证明正确」，只交付「能量到什么」的仪表与证据。
+
 
 
 

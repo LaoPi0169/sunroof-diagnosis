@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>两种体温计 · 可观测性工作台</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#c0392b; --warn:#b7791f; --muted:#8a94a6;
+          --line:#dde3ec; --bg:#f5f7fb; --card:#ffffff; --ink:#1c2733; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:#12263f; color:#fff; padding:14px 22px; }
+  header h1 { font-size:18px; margin:0 0 6px; }
+  #run-bar { font-size:13px; color:#c9d6e8; }
+  #run-bar code { background:#1d3a5f; padding:2px 6px; border-radius:4px; }
+  #btn-reset { float:right; background:#2c4a73; color:#fff; border:1px solid #4a6b99;
+               border-radius:6px; padding:4px 12px; cursor:pointer; }
+  main { padding:16px 22px; max-width:1380px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:4px 0 10px; line-height:1.6; }
+  button { font-size:14px; padding:8px 16px; border-radius:8px; cursor:pointer;
+           border:1px solid var(--line); background:#eef2f8; }
+  button.primary { background:#1a5fb4; border-color:#1a5fb4; color:#fff; }
+  .row { display:flex; gap:10px; margin-bottom:8px; align-items:center; flex-wrap:wrap; }
+  code { background:#eef2f8; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .verdict { padding:9px 12px; border-radius:8px; font-size:13.5px; margin:8px 0; }
+  .verdict.ok   { background:#e8f5ec; color:var(--ok); border:1px solid #bfe3c9; }
+  .verdict.bad  { background:#fdecea; color:var(--bad); border:1px solid #f5c6c0; }
+  .verdict.warn { background:#fdf6e7; color:var(--warn); border:1px solid #f0dcae; }
+  .verdict.info { background:#eef2f8; color:#1c2733; border:1px solid var(--line); }
+  table.t { border-collapse:collapse; width:100%; font-size:12.5px; margin:6px 0; }
+  table.t th, table.t td { border:1px solid var(--line); padding:4px 8px;
+                           text-align:left; word-break:break-all; }
+  table.t th { background:#f2f6fc; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width: 1000px) { .two { grid-template-columns:1fr; } }
+  .viewhead { font-size:14px; font-weight:bold; padding:6px 10px; border-radius:6px; }
+  .viewhead.canary { background:#eef2f8; color:#1a5fb4; }
+  .viewhead.runtime { background:#e8f5ec; color:#1a7f37; }
+  .warnbox { background:#fdecea; border:1px solid #f5c6c0; color:var(--bad);
+             border-radius:8px; padding:8px 12px; font-size:13px; margin:8px 0; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .stat { display:inline-block; margin-right:14px; font-size:13.5px; }
+  .stat b { font-size:16px; }
+  pre { background:#12263f; color:#d7e4f5; padding:10px; border-radius:8px;
+        font-size:11.5px; overflow:auto; max-height:300px; }
+  .badge { display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:10px;
+           margin-left:6px; border:1px solid var(--line); background:#f2f6fc; }
+  .badge.bad { background:#fdecea; border-color:#f5c6c0; color:var(--bad); }
+  .badge.ok  { background:#e8f5ec; border-color:#bfe3c9; color:var(--ok); }
+  select { padding:6px 10px; border:1px solid var(--line); border-radius:6px;
+           font-size:13px; max-width:420px; }
+  ul.red { font-size:13px; line-height:1.8; }
+  ul.red li b { color:var(--bad); }
+  .slo-u { color:var(--warn); font-weight:bold; }
+</style>
+</head>
+<body>
+<header>
+  <button id="btn-reset">重置演示环境</button>
+  <h1>两种体温计 —— 离线考卷金丝雀 × 运行期 SLI（第 16 周交付）</h1>
+  <div id="run-bar">回放批次: <code id="seed">—</code> · 会话: 教学模拟（单用户） ·
+    时钟: 固定 2026-10-09T00:00:00Z · 效果只发生在隔离模拟工单服务</div>
+</header>
+<main>
+  <div class="card">
+    <h2>你在看什么（一分钟版）</h2>
+    <p style="font-size:13.5px; line-height:1.7; margin:4px 0;">
+      系统有两支<b>互不替代</b>的体温计：<b>考卷金丝雀</b>定期用 60 道冻结例题重考系统，
+      量「<b>内容对不对</b>」；<b>运行期 SLI</b> 在每个任务走完后记录它走到了哪一种终态，
+      量「<b>过程健不健康</b>」。两支体温计的<b>分母不同、数字永不合并</b>。
+      下面两块面板可以各自点亮，试着找出那个「两边说法不一样」的任务。</p>
+  </div>
+
+  <div class="card">
+    <h2>两种体温计（并排，物理分开）</h2>
+    <div class="row">
+      <button id="btn-canary" class="primary">运行考卷金丝雀（60 例重考）</button>
+      <button id="btn-replay" class="primary">运行合成回放（10 个任务）</button>
+    </div>
+    <p class="hint">金丝雀 = week-12 冻结 60 例 + 冻结答案键（sha256 校验，考卷被动过就拒绝运行）。
+      回放 = 固定剧本的 10 个 task_run_id（含批准执行 / 撤销 / 拒绝 / 断连对账 / 超时 / 一个
+      「内容错但过程看起来对」的活证据）。</p>
+    <div class="warnbox" id="merge-guard">
+      红线：左表 58/60 与右表 8/10 是<b>两个不同世界的数字</b> ——
+      不相加、不求平均、不互相换算、不合并成「一个成功率」。
+    </div>
+    <div class="two">
+      <div>
+        <div class="viewhead canary">体温计 ① 离线考卷金丝雀（内容正确性）</div>
+        <div id="canary-box"><p class="muted">尚未运行。点上方按钮（约 2-5 秒）。</p></div>
+      </div>
+      <div>
+        <div class="viewhead runtime">体温计 ② 运行期 SLI（过程健康度）</div>
+        <div id="runtime-box"><p class="muted">尚未运行。点上方按钮（约 1 秒）。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>任务追踪（用 task_run_id 还原全过程）</h2>
+    <div class="row">
+      <select id="task-select"><option value="">— 先运行合成回放 —</option></select>
+      <button id="btn-trace" class="primary">查看九阶段链</button>
+    </div>
+    <div id="trace-box"><p class="muted">每个任务都会留下 9 段「行程记录」：请求 → 身份 → 检索 →
+      生成 → 引用/策略核验 → 审批 → MCP 调用 → 对账 → 呈现。缺席的阶段会标「不适用」，
+      不留空洞。</p></div>
+  </div>
+
+  <div class="card">
+    <h2>遥测脱敏检查（普通日志里不许有敏感内容）</h2>
+    <div class="row">
+      <button id="btn-redaction" class="primary">对当前回放流运行脱敏扫描</button>
+    </div>
+    <p class="hint">扫描规则：遥测流中不得出现提问原文、答案/文档正文、审批载荷、客户字段
+      （主管备注/客户姓名/支付明细）、任何凭据标记。</p>
+    <div id="redaction-box"><p class="muted">尚未检查。</p></div>
+  </div>
+
+  <div class="card">
+    <h2>SLO 草案 v0（全部目标待定 [U]，不是达标声明）</h2>
+    <button id="btn-slo" class="primary">载入 SLO 草案</button>
+    <div id="slo-box"><p class="muted">尚未载入。</p></div>
+  </div>
+
+  <div class="card">
+    <h2>本工作台不宣称什么（红线）</h2>
+    <ul class="red">
+      <li><b>没有真实流量</b>：运行视图是固定剧本回放，不是线上监控；SLO 目标全部 [U] 待定。</li>
+      <li><b>两个数字永不合并</b>：考卷 60 例与运行窗口任务数是不同分母。</li>
+      <li><b>运行视图看不见内容错误</b>：NS-HOLD-06 在运行视图是「正常回答」，
+          只有考卷能抓住它 —— 这正是必须两支体温计都有的原因。</li>
+      <li><b>工单都是模拟的</b>：所有写效果只发生在隔离模拟工单服务（SIM- 编号）。</li>
+      <li><b>不宣称系统已安全</b>：本周交付的是「能量到什么」的仪表，不是「已经达标」的结论。</li>
+    </ul>
+  </div>
+</main>
+<script>
+  const res = await fetch(path, {method: method || 'GET',
+    headers: {'Content-Type': 'application/json'},
+    body: method === 'POST' ? '{}' : undefined});
+  const data = await res.json();
+  if (!res.ok) { throw new Error(data.detail || data.error || ('HTTP ' + res.status)); }
+  return data;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---- 体温计 ①: 考卷金丝雀 ----
+async function runCanary() {
+  const box = document.getElementById('canary-box');
+  box.innerHTML = '<p class="muted">正在重考 60 例（约 2-5 秒）…</p>';
+  try {
+    const data = await api('/api/canary', 'POST');
+    const s = data.summary;
+    const mm = (s.mismatches || []).map(m =>
+      `<tr><td><code>${esc(m.case_id)}</code></td><td>${esc(m.expected_state)}</td>` +
+      `<td>${esc(m.observed_mapped_state)}</td>` +
+      `<td>${m.hard_failure ? '<span class="badge bad">硬门</span>' : '<span class="badge">安全侧</span>'}</td>` +
+      `<td>${(m.register_refs || []).map(r => '<code>' + esc(r) + '</code>').join(' ') || '—'}</td></tr>`).join('');
+    box.innerHTML =
+      `<div class="verdict ${s.behavior_drift_cases.length === 0 && s.hygiene_violation_cases.length === 0 ? 'ok' : 'bad'}">` +
+      `${esc(s.verdict)}</div>` +
+      `<span class="stat">重考结果 <b>${esc(s.state_match_rate)}</b></span>` +
+      `<span class="stat">行为漂移 <b>${s.behavior_drift_cases.length}</b> 例</span>` +
+      `<span class="stat">外部效果 <b>${s.external_write_effects}</b></span>` +
+      `<span class="stat">语料 <b>${esc(s.versions.corpus_version)}</b></span>` +
+      `<table class="t"><tr><th>案例</th><th>期望状态</th><th>实际状态</th><th>性质</th><th>失败登记</th></tr>${mm}</table>` +
+      `<p class="hint">答案键 sha256(LF) = <code>${esc(s.answer_key.sha256.slice(0, 16))}…</code>；` +
+      `金丝雀的职责是「发现失败并指路登记」，不是全绿。这个 58/60 是考卷分母，` +
+      `<b>不是</b>线上成功率，与右表无关。</p>`;
+  } catch (e) { box.innerHTML = `<div class="verdict bad">失败: ${esc(e.message)}</div>`; }
+}
+
+// ---- 体温计 ②: 运行期 SLI ----
+async function runReplay() {
+  const box = document.getElementById('runtime-box');
+  box.innerHTML = '<p class="muted">正在回放 10 个任务（约 1 秒）…</p>';
+  try {
+    const data = await api('/api/replay', 'POST');
+    document.getElementById('seed').textContent = data.seed;
+    const m = data.metrics;
+    const rows = data.tasks.map(t => {
+      const badge = t.visible_terminal
+        ? (t.allowed_terminal ? '<span class="badge ok">allowed</span>'
+                              : '<span class="badge bad">未通过</span>')
+        : '<span class="badge">非终态</span>';
+      const flag = (t.task_run_id.endsWith('O-10')) ? ' <span class="badge bad">考卷抓到的假成功</span>' : '';
+      return `<tr><td><code>${esc(t.task_run_id)}</code></td><td>${esc(t.kind)}</td>` +
+        `<td>${esc(t.visible_terminal || ('(未定终态) ' + t.outcome))}${flag}</td>` +
+        `<td>${t.external_effects}</td><td>${badge}</td></tr>`;
+    }).join('');
+    const dist = Object.entries(m.terminal_distribution)
+      .filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(' · ');
+    box.innerHTML =
+      `<span class="stat">allowed 终态率 <b>${m.allowed_terminal_rate.numerator}/` +
+      `${m.allowed_terminal_rate.denominator}</b></span>` +
+      `<span class="stat">禁止效果 <b>${m.forbidden_effect_count}</b></span>` +
+      `<span class="stat">未确认效果 <b>${m.unconfirmed_effects}</b></span>` +
+      `<table class="t"><tr><th>task_run_id</th><th>类型</th><th>可见终态</th><th>效果</th><th>判定</th></tr>${rows}</table>` +
+      `<p class="hint">终态分布: ${esc(dist)}；非终态: ${esc(JSON.stringify(m.non_terminal_distribution))}。` +
+      `<b>${esc(m.content_note)}</b></p>` +
+      `<p class="hint">分母口径: ${esc(m.denominator_note)}</p>`;
+    fillTaskSelect(data.tasks);
+  } catch (e) { box.innerHTML = `<div class="verdict bad">失败: ${esc(e.message)}</div>`; }
+}
+
+// ---- 任务追踪 ----
+function fillTaskSelect(tasks) {
+  const sel = document.getElementById('task-select');
+  sel.innerHTML = '';
+  tasks.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.task_run_id;
+    opt.textContent = `${t.task_run_id}（${t.kind} → ${t.visible_terminal || t.outcome}）`;
+    sel.appendChild(opt);
+  });
+}
+
+async function showTrace() {
+  const box = document.getElementById('trace-box');
+  const id = document.getElementById('task-select').value;
+  if (!id) { box.innerHTML = '<p class="muted">请先运行合成回放。</p>'; return; }
+  try {
+    const data = await api('/api/trace/' + encodeURIComponent(id));
+    const t = data.task;
+    const rows = data.spans.map(s =>
+      `<tr><td>${esc(s.stage)}</td>` +
+      `<td>${s.not_applicable ? '<span class="badge">不适用</span>' : esc(s.result)}</td>` +
+      `<td>${esc(JSON.stringify(s.versions))}</td>` +
+      `<td>${esc(JSON.stringify(s.safe_refs))}</td>` +
+      `<td>${s.duration_ms}ms</td></tr>`).join('');
+    const chain = ['审批 ID', '幂等键', '工单号', '版本链']
+      .map(k => `<b>${k}</b>: ${esc(JSON.stringify(data.safe_refs[k] || data.versions[k] || '—'))}`)
+      .join('<br>');
+    const canary = data.safe_refs.canary_link
+      ? `<div class="verdict warn">双视图分歧活证据：${esc(JSON.stringify(data.safe_refs.canary_link))}</div>` : '';
+    box.innerHTML =
+      `<div class="verdict info">任务 <code>${esc(t.task_run_id)}</code> · 终态 ` +
+      `<b>${esc(t.visible_terminal || t.outcome)}</b> · 外部效果 ${t.external_effects} · ` +
+      `${t.stage_count} 段</div>${canary}` +
+      `<table class="t"><tr><th>阶段</th><th>结果</th><th>版本链</th><th>安全引用</th><th>观测时长</th></tr>${rows}</table>` +
+      `<p class="hint">${chain}</p>` +
+      `<p class="hint">断点 #1（RAG→策略）：检索/生成段的 corpus/dataset/candidate 版本与策略段的 policy_version 同链可追。` +
+      `断点 #2（MCP→审批+幂等）：mcp_call 段的 approval_id / idempotency_key / ticket_id 可关联。` +
+      `时长为观测值，不设门。</p>`;
+  } catch (e) { box.innerHTML = `<div class="verdict bad">失败: ${esc(e.message)}</div>`; }
+}
+
+// ---- 脱敏检查 ----
+async function runRedaction() {
+  const box = document.getElementById('redaction-box');
+  try {
+    const data = await api('/api/redaction-check', 'POST');
+    box.innerHTML = `<div class="verdict ${data.passed ? 'ok' : 'bad'}">${esc(data.verdict)}</div>` +
+      `<p class="hint">检查事件 ${data.checked_events} 条；违规 ${data.violations.length} 项。</p>`;
+  } catch (e) { box.innerHTML = `<div class="verdict bad">失败: ${esc(e.message)}</div>`; }
+}
+
+// ---- SLO 草案 ----
+async function loadSlo() {
+  const box = document.getElementById('slo-box');
+  try {
+    const d = await api('/api/slo');
+    const rows = d.slos.map(s =>
+      `<tr><td><code>${esc(s.id)}</code> ${esc(s.name)}</td><td>${esc(s.sli)}</td>` +
+      `<td>${s.target.includes('[U]') ? '<span class="slo-u">' + esc(s.target) + '</span>' : esc(s.target)}</td>` +
+      `<td>${s.window.includes('[U]') ? '<span class="slo-u">' + esc(s.window) + '</span>' : esc(s.window)}</td></tr>`).join('');
+    box.innerHTML = `<div class="verdict warn">${esc(d.status)}</div>` +
+      `<table class="t"><tr><th>SLO</th><th>SLI 口径</th><th>目标</th><th>窗口</th></tr>${rows}</table>` +
+      `<p class="hint">${esc(d.definition_of_u)} ${esc(d.view_note)}</p>`;
+  } catch (e) { box.innerHTML = `<div class="verdict bad">失败: ${esc(e.message)}</div>`; }
+}
+
+// ---- 重置与绑定 ----
+async function resetAll() {
+  await api('/api/reset', 'POST');
+  document.getElementById('seed').textContent = '—';
+  document.getElementById('canary-box').innerHTML = '<p class="muted">尚未运行。</p>';
+  document.getElementById('runtime-box').innerHTML = '<p class="muted">尚未运行。</p>';
+  document.getElementById('task-select').innerHTML = '<option value="">— 先运行合成回放 —</option>';
+  document.getElementById('trace-box').innerHTML = '<p class="muted">已重置。</p>';
+  document.getElementById('redaction-box').innerHTML = '<p class="muted">已重置。</p>';
+}
+
+document.getElementById('btn-canary').addEventListener('click', runCanary);
+document.getElementById('btn-replay').addEventListener('click', runReplay);
+document.getElementById('btn-trace').addEventListener('click', showTrace);
+document.getElementById('btn-redaction').addEventListener('click', runRedaction);
+document.getElementById('btn-slo').addEventListener('click', loadSlo);
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+</script>
+</body>
+</html>

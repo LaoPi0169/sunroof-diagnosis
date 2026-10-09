@@ -329,5 +329,43 @@ Week 15 变化点（交付物见 README「第 15 周：攻击、撤销并恢复�
   （94 测试含全部既有冻结对账用例全绿；全量与 CI 各触发一次 baseline jsonl
   行尾搅动，均按既有口径 `git restore`，未入库）。
 
+## 十二、Week 16 CI 运行证据（2026-10-09，离线金丝雀 × 运行期 SLI 可观测性）
+
+```
+CI RUN 2026-10-09T05:28:08+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 106 tests in 29.384s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=44, emissions_checked=55, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=50113; smokes_passed=4/4
+CI RESULT OK | duration=31.8s
+```
+
+证据日志：`evidence/ci-run-w16.log`（新增独立文件，未追加 w15/w14/w08 历史）。
+
+Week 16 变化点（交付物见 README「第 16 周：离线质量金丝雀与运行期 SLI」小节）：
+
+- STAGE-2 全量测试 94 → 106（新增 `tests/test_telemetry_observability.py`
+  12 个用例：九阶段任务追踪 + 两断点关联 / 终态分类对照表 18 组 /
+  金丝雀复现冻结基线 58/60 + 行为零漂移 + 失败指路 F12-01/F12-02/F12-04 /
+  金丝雀只读消费冻结物（week-12 五文件 sha 前后一致 + 答案键 LF sha 对齐
+  第 12 周记录） / 回放终态序列与效果（8/10、forbidden=0、unconfirmed=1、
+  效果合计 3） / 两视图永不合并 + NS-HOLD-06 双视图分歧活证据 /
+  遥测脱敏 90 span 零违规 + 扫描器反向有效性 / 工作台 API 端到端
+  （replay/canary/trace/redaction/slo/reset + 404） / SLO 草案 v0 诚实性
+  （[U] 与无编造百分比） / 工具允许列表不变 / 样例工件门 /
+  归约器语义（denied 携带效果 → forbidden_effect_count 抓得住））。
+- STAGE-3 扫描范围 39 → 44 文件：`mcptool/telemetry.py`、
+  `mcptool/run_canary.py`、`mcptool/run_telemetry_replay.py` 与
+  `workbench_observability/__init__.py`、`workbench_observability/app.py`
+  入列；55 个输出点零违规。遥测自检清单不持有凭据字面量（凭据检测职责
+  仍在 STAGE-3 全范围字面量扫描 + "token" 键名兜底）。
+- 工具层证据：金丝雀 60 例重考 58/60 与冻结答案键一致（行为漂移 0、语料
+  卫生 0、已知失败组合不变）；week-12 冻结物零写入（test_04 sha 前后复核）；
+  回放 10 任务效果合计恰 3（两次已确认创建 + 一次待对账）、拒绝/撤销/
+  超时路径效果恒 0；90 段 span 全链可还原且脱敏零违规。
+- 一致性门复验：第 8 周动态发现测试数（106）已同步进 README；baseline jsonl
+  行尾搅动本轮再触发，`git restore` 未入库。
+
+
 
 
