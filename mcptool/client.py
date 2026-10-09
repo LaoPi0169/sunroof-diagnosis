@@ -19,6 +19,10 @@ Host 职责 (回链 week-13/trust-boundary-v1.md 六分区 + week-14 审批硬�
      响应丢失 -> result_unknown -> 按幂等键先查后说 -> action_completed (独立核验)
      或 reconciliation_pending (禁止伪造终态, 恢复第一动作永远是查询不是再次创建,
      A-06); 撤销的审批在执行时重读当前状态 -> approval_revoked (A-04)。
+   7) Week 17: 依赖故障安全降级 —— MCP 写通道不可达 (演练注入) 或 MCP_OFF
+      开关激活时, ticket.create 停在 action_preview (degraded=true,
+      reason_code=mcp_unavailable, 外部效果恒 0, 审批不消耗, 不自动重试);
+      判定优先级: 权限拒绝/确定性错误照常走服务端, 不被降级吞掉。
 外部效果只可能来自带有效审批的 ticket.create (唯一写入口); 其余路径恒 0。
 """
 from __future__ import annotations
@@ -30,8 +34,11 @@ from . import server as server_mod
 from . import write_contract as W
 from .approval import ApprovalService
 from .capability_manifest import ServedCatalog
+from .kill_switch import SWITCH_MCP_OFF
 from .policy import WritePolicy
-from .ticket_service import QueryUnavailableError, ResponseLostError, TicketService
+from .ticket_service import (
+    McpUnavailableError, QueryUnavailableError, ResponseLostError, TicketService,
+)
 
 # Host 全局允许列表 (1 只读 + 3 写; 未注册工具/版本一律拒绝)
 ALLOWED_TOOLS = (C.TOOL_NAME,) + W.WRITE_TOOLS
@@ -56,7 +63,8 @@ class McpHost:
     def __init__(self, session: TrustedSession, *, clock=None,
                  server_fn=None, store=None, deadline_ms=C.DEADLINE_MS,
                  ticket_service=None, approval_service=None, policy=None,
-                 write_deadline_ms=W.DEADLINE_MS, catalog=None):
+                 write_deadline_ms=W.DEADLINE_MS, catalog=None,
+                 kill_switch=None, write_probe=None):
         self.session = session
         self._clock = clock or (lambda: time.strftime(
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
@@ -71,6 +79,10 @@ class McpHost:
         # 能力清单门 (Week 15): served 目录缺省 == 冻结清单; 夹具可注入 rogue 描述
         self._catalog = catalog or ServedCatalog.from_manifest()
         self._quarantined = set()  # 已隔离能力 (解除须人工 restore_capability)
+        # 降级缝 (Week 17): kill_switch=KillSwitchRegistry (运营手段);
+        # write_probe=WriteChannelProbe (演练注入手段) —— 两条路同一安全终态
+        self._kill_switch = kill_switch
+        self._write_probe = write_probe
         self.audit = []            # 受限审计 (含细分 reason_typed; 报告引用须标注 restricted)
         self.security_events = []  # contract_violation 安全事件
         self.external_write_effects = 0  # 累计外部效果增量 (只读调用恒为 0)
@@ -182,6 +194,77 @@ class McpHost:
             "error": {"code": code, "message": W.SAFE_MESSAGES[code]},
         }
 
+    # ==========================================================================
+    # Week 17: 依赖故障安全降级 (MCP 不可用 -> 停在 action_preview)
+    # ==========================================================================
+
+    def _degradation_gate(self, entry: dict, tool: str, arguments: dict,
+                          approval_id):
+        """写执行前的降级缝: 返回降级封套 (命中) 或 None (照常走服务端)。
+
+        判定优先级 (合同: 权限拒绝保持拒绝, 降级不得吞掉确定性错误):
+          允许列表 -> 能力清单 -> schema -> [审批当前有效?] -> 降级 -> 服务端。
+        只有 tool=ticket.create 且 (注入探测不可达 或 MCP_OFF 激活) 且审批当前
+        状态为 approved 才降级; 缺审批/审批无效/参数非法等照常走服务端拿
+        确定性错误 —— 降级只替代「依赖故障」这一类失败, 不替代任何业务判定。
+        """
+        if tool != W.TOOL_CREATE:
+            return None  # 开关作用域 = 写执行; 预览/核验查询不受阻
+        injected = False
+        if self._write_probe is not None:
+            try:
+                self._write_probe.check()
+            except McpUnavailableError:
+                injected = True
+        switch_on = (self._kill_switch is not None
+                     and self._kill_switch.is_active(SWITCH_MCP_OFF))
+        if not injected and not switch_on:
+            return None
+        if not approval_id:
+            return None  # 无审批 -> 照常 approval_required (权限判定优先)
+        _record, status = self._approval_service.status_now(
+            approval_id, now=self._clock())
+        if status != "approved":
+            return None  # 撤销/过期/用尽 -> 照常确定性错误 (权限判定优先)
+        trigger = ("fault_injection:write_probe" if injected
+                   else "kill_switch:MCP_OFF")
+        return self._degraded_preview(
+            entry, arguments, reason_typed=f"mcp_unavailable:{trigger}")
+
+    def _degraded_preview(self, entry: dict, arguments: dict, *,
+                          reason_typed: str) -> dict:
+        """降级封套: 任务停在 action_preview (手册 3924/3959-3966 可观察结果)。
+
+        - 不隐藏失败: degraded=true + reason_code=mcp_unavailable + 明确提示;
+        - 不扩大权限/不产生效果: external_effect_count=0, 工单计数前后一致;
+        - 不自动重试: 本方法单次返回, 重试决策留给用户 (retry_later);
+        - 审批不在此消耗 (深层缝除外): 恢复后同一审批可直接续跑;
+        - canonical_parameters 来自已过封闭校验的同一 arguments (预览即合同);
+        - 封套由 Host 生成, 不再过服务端封套硬门 (与 _after_response_lost 同理)。
+        """
+        canonical, _err = W.validate_write_arguments(arguments)
+        count = self._ticket_service.ticket_count()
+        envelope = {
+            "status": W.STATUS_PREVIEW,
+            "tool_version": W.TOOL_VERSION,
+            "effect": W.EFFECT,
+            "degraded": True,
+            "reason_code": W.REASON_MCP_UNAVAILABLE,
+            "message": W.DEGRADED_PREVIEW_MESSAGE,
+            "canonical_parameters": canonical,
+            "resource_scope": W.resource_scope(canonical["case_id"]),
+            "allowed_next_actions": list(W.ALLOWED_NEXT_ACTIONS),
+            "idempotency_key": W.idempotency_key(entry["run_id"]),
+            "external_effect_count": 0,
+            "external_ticket_count_before": count,
+            "external_ticket_count_after": count,
+        }
+        entry["outcome"] = W.STATUS_PREVIEW
+        entry["reason_typed"] = reason_typed
+        entry["degraded"] = True
+        entry["external_write_effects"] = 0
+        return envelope
+
     def call_write(self, tool, arguments, *, run_id, approval_id=None,
                    rag_terminal=None, delay_seconds=0.0, rogue_mode=None,
                    fail_after_commit=False) -> dict:
@@ -222,6 +305,14 @@ class McpHost:
                 return self._typed_write_error(
                     entry, W.ERROR_INVALID_ARGUMENT, f"schema:{err}")
 
+        # 2.5) 第 17 周降级缝 (仅 ticket.create; 权限判定优先于降级):
+        #      MCP 不可达 (注入) 或 MCP_OFF 开关激活 -> 停在 action_preview,
+        #      外部效果恒 0、审批不消耗、绝不自动重试 (决策留给用户);
+        #      确定性错误 (schema/审批/权限) 不被降级吞掉 -> 照常走服务端。
+        degraded = self._degradation_gate(entry, tool, arguments, approval_id)
+        if degraded is not None:
+            return degraded
+
         # 3) 调用服务端 (deadline 客户端强制; 外部效果以前后计数差观测);
         #    A-06 断连夹具: 提交成功后响应丢失 -> 本层捕获并进入对账编排
         self.server_calls += 1
@@ -247,6 +338,12 @@ class McpHost:
                     ticket_service=self._ticket_service)
         except ResponseLostError:
             return self._after_response_lost(entry, run_id, before)
+        except McpUnavailableError:
+            # 深层缝: 依赖在服务端深处失败 (create 第 5 步已消耗审批) -> 同一
+            # 安全终态; 幂等键不变, 恢复后重新确认审批再续跑, 绝无第二个效果。
+            return self._degraded_preview(
+                entry, arguments,
+                reason_typed="mcp_unavailable:fault_injection:deep_seam")
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         after = self._ticket_service.ticket_count()
         delta = after - before

@@ -369,3 +369,45 @@ Week 16 变化点（交付物见 README「第 16 周：离线质量金丝雀与�
 
 
 
+
+## 十三、Week 17 CI 运行证据（2026-10-09，依赖故障安全降级 × 关闭开关 × 恢复复验）
+
+```
+CI RUN 2026-10-09T08:33:48+00:00 (UTC) | host=local | python=3.13.15
+[PASS] STAGE-1-schema :: integrity=ok; migrations=3; required_tables_missing=[]; ingestion_tables=2
+[PASS] STAGE-2-unittest :: Ran 122 tests in 29.223s, exit=0
+[PASS] STAGE-3-redaction :: scanned_files=48, emissions_checked=56, violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=app; port=60721; smokes_passed=4/4
+CI RESULT OK | duration=31.8s
+```
+
+证据日志：`evidence/ci-run-w17.log`（新增独立文件，未追加 w16/w15/w08 历史）。
+
+Week 17 变化点（交付物见 README「第 17 周：让依赖故障进入安全降级路径」小节）：
+
+- STAGE-2 全量测试 106 → 122（新增 `tests/test_degradation_week17.py`
+  16 个用例：开关注册表审计与未知开关拒绝 / 审计快照不可变 /
+  MCP_OFF 降级封套合同（action_preview + reason_code=mcp_unavailable +
+  0 效果 + 审批不消耗）/ 权限判定优先（无审批/撤销 -> 确定性错误不被降级
+  吞掉）/ 注入降级恰 1 次探测（不重试、服务端不被打扰）/ 深层缝同终态 +
+  幂等键防重复效果 / 降级 store 快照逐字节不变 / trace 终态 action_preview_held
+  -> 允许终态 + 降级带效果被 forbidden_effect_count 抓住 / 恢复复验注入路
+  （同一 run_id+同一审批续跑恰 1 效果 + 幂等重放）/ 恢复复验开关路
+  （按批准复位 + 审计留痕）/ 恢复后受限任务仍拒绝 / D-01 模型超时固定演练 /
+  D-02 索引过期固定演练 / 演练全套（8 段 pass + 效果合计 3 + 脱敏 0 违规）/
+  允许列表与 week-15 冻结合同 sha256 不变 / 工作台 API 端到端）。
+- STAGE-3 扫描范围 44 → 48 文件：`mcptool/kill_switch.py`、
+  `mcptool/run_degradation_drill.py` 与 `workbench_degradation/__init__.py`、
+  `workbench_degradation/app.py` 入列；56 个输出点零违规。
+- 工具层证据：8 段固定演练全 pass（D-01 模型超时 -> system_failed /
+  D-02 索引过期 -> abstained / D-03+D-04 MCP 不可用（注入/开关两路同一终态）
+  -> action_preview（0 效果、审批不消耗、探测恰 1 次）/ D-05a+b 恢复复验
+  （同一 run_id 续跑恰 1 效果 + 幂等重放无重复 + 复位审计留痕）/ D-05c
+  受限任务仍拒绝 / D-06 第 15 周 A-06 对账回归）；allowed 7/8、
+  forbidden_effect_count=0、效果合计恰 3；证据
+  `week-17/degradation-drill-evidence-v1.jsonl`（86 行，逐行可扫描 0 违规）。
+- 遥测词表 v1.1 增补（登记性扩展）：第八类可见终态 `action_preview`（允许），
+  既有六类语义零改动；降级终态携带效果并入 forbidden_effect_count 口径。
+- 一致性门复验：第 8 周动态发现测试数（122）已同步进 README；
+  deterministic-baseline-results-v1.jsonl 行尾搅动本轮再触发，
+  按既有口径 `git restore`，未入库。

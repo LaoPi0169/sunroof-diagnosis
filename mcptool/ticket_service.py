@@ -40,6 +40,11 @@ class QueryUnavailableError(Exception):
     """对账查询不可用夹具 (A-06 第二段): 连幂等键查询都无法完成。"""
 
 
+class McpUnavailableError(Exception):
+    """MCP 写通道不可用 (Week 17 降级缝): 依赖故障 —— 编排层必须停在预览、
+    外部效果恒 0、绝不自动重试创建 (手册 3924/3961-3966)。"""
+
+
 class TicketService:
     """隔离模拟服务的一个实例 = 一个独立的「外部系统」。"""
 
@@ -137,3 +142,17 @@ class TicketService:
     def snapshot(self) -> str:
         """store 快照 (排序 JSON): 运行前后对比用。"""
         return json.dumps(self._tickets, sort_keys=True, ensure_ascii=False)
+
+
+class UnavailableWriteTickets(TicketService):
+    """深层注入缝 (Week 17): 写通道不可达 —— create 一律抛 McpUnavailableError。
+
+    主缝在编排层前置探测 (client.py 注入的 WriteChannelProbe.check(), 服务端
+    不被打扰、审批不消耗); 本子类是纵深防御的第二条缝: 若编排层探测被绕过,
+    依赖在服务端深处失败 —— 此时审批额度已在 create 第 5 步消耗 (先消耗后写),
+    降级封套照常 0 效果, 恢复后续跑需重新确认审批 (幂等键不变, 绝不产生
+    第二个效果)。
+    """
+
+    def create_review_ticket(self, **kwargs):
+        raise McpUnavailableError("mcp write channel unavailable (deep seam)")

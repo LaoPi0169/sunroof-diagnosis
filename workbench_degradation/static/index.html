@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安全降级 · 降级工作台（第 17 周）</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#c0392b; --warn:#b7791f; --muted:#8a94a6;
+          --line:#dde3ec; --bg:#f5f7fb; --card:#ffffff; --ink:#1c2733; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:#12263f; color:#fff; padding:14px 22px; }
+  header h1 { font-size:18px; margin:0 0 6px; }
+  #run-bar { font-size:13px; color:#c9d6e8; }
+  #run-bar code { background:#1d3a5f; padding:2px 6px; border-radius:4px; }
+  #btn-reset { float:right; background:#2c4a73; color:#fff; border:1px solid #4a6b99;
+               border-radius:6px; padding:4px 12px; cursor:pointer; }
+  main { padding:16px 22px; max-width:1380px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:4px 0 10px; line-height:1.6; }
+  button { font-size:14px; padding:8px 16px; border-radius:8px; cursor:pointer;
+           border:1px solid var(--line); background:#eef2f8; }
+  button.primary { background:#1a5fb4; border-color:#1a5fb4; color:#fff; }
+  button.danger { background:#c0392b; border-color:#c0392b; color:#fff; }
+  button.warn { background:#b7791f; border-color:#b7791f; color:#fff; }
+  .row { display:flex; gap:10px; margin-bottom:8px; align-items:center; flex-wrap:wrap; }
+  code { background:#eef2f8; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .verdict { padding:9px 12px; border-radius:8px; font-size:13.5px; margin:8px 0; }
+  .verdict.ok   { background:#e8f5ec; color:var(--ok); border:1px solid #bfe3c9; }
+  .verdict.bad  { background:#fdecea; color:var(--bad); border:1px solid #f5c6c0; }
+  .verdict.warn { background:#fdf6e7; color:var(--warn); border:1px solid #f0dcae; }
+  .verdict.info { background:#eef2f8; color:#1c2733; border:1px solid var(--line); }
+  table.t { border-collapse:collapse; width:100%; font-size:12.5px; margin:6px 0; }
+  table.t th, table.t td { border:1px solid var(--line); padding:4px 8px;
+                           text-align:left; word-break:break-all; }
+  table.t th { background:#f2f6fc; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width: 1000px) { .two { grid-template-columns:1fr; } }
+  pre { background:#12263f; color:#d7e4f5; padding:10px; border-radius:8px;
+        font-size:11.5px; overflow:auto; max-height:320px; }
+  .badge { display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:10px;
+           margin-left:6px; border:1px solid var(--line); background:#f2f6fc; }
+  .badge.bad { background:#fdecea; border-color:#f5c6c0; color:var(--bad); }
+  .badge.ok  { background:#e8f5ec; border-color:#bfe3c9; color:var(--ok); }
+  .badge.warn{ background:#fdf6e7; border-color:#f0dcae; color:var(--warn); }
+  select { padding:6px 10px; border:1px solid var(--line); border-radius:6px;
+           font-size:13px; max-width:460px; }
+  ul.red { font-size:13px; line-height:1.8; }
+  ul.red li b { color:var(--bad); }
+  .stat { display:inline-block; margin-right:14px; font-size:13.5px; }
+  .stat b { font-size:16px; }
+  .warnbox { background:#fdecea; border:1px solid #f5c6c0; color:var(--bad);
+             border-radius:8px; padding:8px 12px; font-size:13px; margin:8px 0; }
+</style>
+</head>
+<body>
+<script>
+/* 兜底哨兵（ES5）: 主脚本若解析/执行失败, 顶部显示可见红条 —— 业务用户不面对沉默失灵的按钮 */
+window.__wbFatal = function (msg) {
+  var bar = document.getElementById('js-error-bar');
+  if (!bar && document.body) {
+    bar = document.createElement('div');
+    bar.id = 'js-error-bar';
+    bar.style.cssText = 'background:#fdecea;border-bottom:1px solid #f5c6c0;color:#c0392b;'
+      + 'padding:10px 16px;font:13px/1.6 "Microsoft YaHei",sans-serif;';
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+  if (bar) {
+    bar.style.display = 'block';
+    bar.textContent = '页面脚本异常: ' + msg + '　—— 请改用新版 Edge / Chrome 并按 Ctrl+F5 刷新; 仍失败请联系交付人。';
+  }
+};
+window.addEventListener('error', function (e) {
+  if (e && e.message) { window.__wbFatal(String(e.message)); }
+});
+</script>
+<header>
+  <button id="btn-reset" type="button">重置演示环境</button>
+  <h1>依赖故障安全降级 —— 注入 × 关闭开关 × 恢复复验（第 17 周交付）</h1>
+  <div id="run-bar">当前任务: <code id="cur-run">—</code> · 工单总数: <code id="cur-tickets">0</code>
+    · 外部效果: <code id="cur-effects">0</code> · 会话: 教学模拟（单用户） ·
+    效果只发生在隔离模拟工单服务</div>
+</header>
+<main>
+<div id="degraded-banner" class="warnbox" style="display:none;"></div>
+
+<div class="card">
+  <h2>0 · 你在测什么（一分钟版）</h2>
+  <p class="hint">
+    系统依赖的三类东西坏了的时候（模型超时 / 索引过期 / MCP 写通道不可用），<b>合格的表现不是报错红字，
+    也不是硬着头皮继续</b>，而是停进一个「明确、权限安全、可以继续人工处理」的安全终态。本周重点看
+    <b>MCP 写通道不可用</b>：任务应该停在 <b>action_preview（预览保留、尚未创建）</b>，外部效果必须是
+    <b>0</b>，绝不自动重试写入；恢复之后用同一个任务编号续跑，工单数量<b>只能多 1 张，绝不能多 2 张</b>。
+  </p>
+</div>
+
+<div class="card">
+  <h2>1 · 环境面板</h2>
+  <div class="row">
+    <span class="stat">故障注入 <b id="st-fault">未注入</b></span>
+    <span class="stat">MCP_OFF 开关 <b id="st-switch">未激活</b></span>
+    <span class="stat">审批 <b id="st-approval">未签发</b></span>
+  </div>
+  <table class="t" id="switch-table">
+    <tr><th>开关</th><th>状态</th><th>作用域</th><th>安全终态</th><th>是否已接线</th></tr>
+  </table>
+  <p class="hint">开关动作（谁、为什么、何时）全部进追加式审计，见下方「开关审计」。</p>
+</div>
+
+<div class="card">
+  <h2>2 · 正常对照组（先证明平时是好的）</h2>
+  <div class="row">
+    <button id="btn-preview" class="primary" type="button">① 生成预览</button>
+    <button id="btn-approve" type="button">② 批准（受控确认）</button>
+    <button id="btn-execute" type="button">③ 执行创建</button>
+    <span id="normal-verdict"></span>
+  </div>
+  <p class="hint">预期：预览后工单数不变（预览零效果）；批准并执行后 <b>action_completed</b>，工单数 +1，
+     并由 ticket.get 独立核验。</p>
+</div>
+
+<div class="two">
+  <div class="card">
+    <h2>3 · 故障路 A：注入「MCP 不可用」（演练手段）</h2>
+    <div class="row">
+      <button id="btn-inject" class="danger" type="button">注入故障</button>
+      <button id="btn-restore" type="button">解除注入（依赖恢复）</button>
+      <button id="btn-retry" class="primary" type="button">续跑同一任务（retry_later）</button>
+      <button id="btn-replay" type="button">幂等重放（看计数是否不变）</button>
+    </div>
+    <p class="hint">剧本：注入 → 再走一遍 ②批准 ③执行 → 任务应停在 <b>action_preview</b>、外部效果 <b>0</b>、
+       审批<b>不被消耗</b>；解除注入后续跑 → <b>action_completed</b> 且工单只 +1；
+       再点幂等重放 → 仍是同一张工单，计数不变。</p>
+    <div id="copy-box"></div>
+  </div>
+  <div class="card">
+    <h2>4 · 故障路 B：关闭开关 MCP_OFF（运营手段）</h2>
+    <div class="row">
+      <button id="btn-switch-on" class="warn" type="button">打开开关 MCP_OFF</button>
+      <button id="btn-switch-off" type="button">按批准复位 MCP_OFF</button>
+    </div>
+    <p class="hint">开关和注入是<b>两条不同的路</b>，但必须落进<b>同一个安全终态</b>。
+       另有负例：开关激活时「无审批执行」应得到 <b>approval_required</b>（权限拒绝保持拒绝，
+       不能被降级吞掉）——你可以在 ②选择「拒绝」后点 ③执行来验证。</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>5 · 三类固定演练（模型超时 / 索引过期 / MCP 不可用 + 恢复复验）</h2>
+  <div class="row">
+    <button id="btn-drills" class="primary" type="button">运行 8 段固定演练剧本</button>
+    <span id="drills-verdict"></span>
+  </div>
+  <table class="t" id="drills-table">
+    <tr><th>段</th><th>故障</th><th>路径</th><th>task_run_id</th><th>终态</th><th>效果</th><th>结论</th></tr>
+  </table>
+  <p class="hint">D-01 模型超时 → system_failed（诚实失败，不生成未经验证的答案）；
+     D-02 索引过期 → abstained（「当前资料无法确认」+ 知识所有者入口）；
+     D-03/D-04 MCP 不可用 → action_preview；D-05 恢复复验；D-06 第 15 周断连对账回归。</p>
+</div>
+
+<div class="two">
+  <div class="card">
+    <h2>6 · 任务追踪（九阶段链）</h2>
+    <div class="row">
+      <select id="task-select"></select>
+      <button id="btn-trace" type="button">查看九阶段链</button>
+    </div>
+    <div id="trace-box"></div>
+  </div>
+  <div class="card">
+    <h2>7 · 开关审计 + 遥测脱敏检查</h2>
+    <table class="t" id="audit-table">
+      <tr><th>事件</th><th>开关</th><th>操作人</th><th>理由</th><th>时刻</th></tr>
+    </table>
+    <div class="row">
+      <button id="btn-redaction" type="button">运行脱敏扫描</button>
+      <span id="redaction-verdict"></span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>8 · 最近一次结果（机读封套）</h2>
+  <pre id="last-json">（尚未执行任何动作）</pre>
+</div>
+
+<div class="card">
+  <h2>9 · 本工作台不宣称什么（红线）</h2>
+  <ul class="red">
+    <li><b>降级不豁免任何安全机制</b>：ACL、审批、审计在降级路径照常生效；</li>
+    <li><b>降级必须零效果</b>：action_preview 携带任何外部效果都是合同违规（SLI 会抓住）；</li>
+    <li><b>权限拒绝保持拒绝</b>：开关/注入不吞掉 approval_required / approval_revoked 等确定性错误；</li>
+    <li><b>不自动重试写</b>：写入重试决策永远留给用户（retry_later），先查询后说；</li>
+    <li><b>教学模拟</b>：工单都是隔离模拟服务里的记录，MCP 故障是确定性注入，不是真实事故；</li>
+    <li><b>「进程活着」不算恢复</b>：恢复复验=重跑用户任务 + 效果对账 + 受限任务仍拒绝。</li>
+  </ul>
+</div>
+</main>
+<script>
+/* 主脚本 (ES5): 全部按钮 -> /api/*; 渲染只读状态; 出错走顶部红条 */
+(function () {
+  'use strict';
+  var LAST = null; // 最近一次任务追踪下拉数据
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function api(method, path, body, cb) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) { opts.body = JSON.stringify(body); }
+    fetch(path, opts).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+    }).then(function (res) {
+      if (!res.ok) {
+        window.__wbFatal((res.data && res.data.detail) ? res.data.detail : ('HTTP ' + res.status));
+        return;
+      }
+      cb(res.data);
+    }).catch(function (err) { window.__wbFatal(String(err)); });
+  }
+
+  function verdict(el, kind, text) {
+    el.innerHTML = '<div class="verdict ' + kind + '">' + esc(text) + '</div>';
+  }
+
+  function renderCommon(st) {
+    $('cur-run').textContent = st.run_id || '—';
+    $('cur-tickets').textContent = String(st.ticket_total);
+    $('cur-effects').textContent = String(st.external_effects);
+    $('st-fault').textContent = st.degraded.fault_injected ? '已注入' : '未注入';
+    $('st-switch').textContent = st.degraded.mcp_off_active ? '激活' : '未激活';
+    $('st-approval').textContent = st.decision_effective || '未签发';
+    var banner = $('degraded-banner');
+    if (st.degraded.degraded_now) {
+      banner.style.display = 'block';
+      banner.textContent = '降级模式生效中（' + st.degraded.source +
+        '）：写执行会停在 action_preview，外部效果 0 —— 这是设计的 safe 行为，不是页面故障。';
+    } else {
+      banner.style.display = 'none';
+    }
+    // 开关状态表
+    var rows = '';
+    var names = ['MCP_OFF', 'MODEL_OFF', 'INDEX_STALE'];
+    for (var i = 0; i < names.length; i++) {
+      var sw = st.switch_status[names[i]] || {};
+      rows += '<tr><td><code>' + esc(names[i]) + '</code></td><td>' +
+        (sw.active ? '<span class="badge bad">激活</span>' : '未激活') + '</td><td>' +
+        esc(sw.scope) + '</td><td>' + esc(sw.safe_terminal) + '</td><td>' +
+        (sw.wired ? '<span class="badge ok">已接线</span>' : '<span class="badge warn">仅登记(演练)</span>') +
+        '</td></tr>';
+    }
+    var st2 = $('switch-table');
+    st2.innerHTML = '<tr><th>开关</th><th>状态</th><th>作用域</th><th>安全终态</th><th>是否已接线</th></tr>' + rows;
+    // 开关审计表
+    var arows = '';
+    var audit = st.switch_audit || [];
+    for (var j = 0; j < audit.length; j++) {
+      arows += '<tr><td>' + esc(audit[j].event) + '</td><td><code>' + esc(audit[j].switch) +
+        '</code></td><td>' + esc(audit[j].operator) + '</td><td>' + esc(audit[j].reason || '') +
+        '</td><td>' + esc(audit[j].at) + '</td></tr>';
+    }
+    $('audit-table').innerHTML =
+      '<tr><th>事件</th><th>开关</th><th>操作人</th><th>理由</th><th>时刻</th></tr>' +
+      (arows || '<tr><td colspan="5">（暂无开关动作）</td></tr>');
+    // 任务下拉
+    var sel = $('task-select');
+    sel.innerHTML = '';
+    var tasks = st.tasks || [];
+    for (var k = 0; k < tasks.length; k++) {
+      var t = tasks[k];
+      var opt = document.createElement('option');
+      opt.value = t.task_run_id;
+      opt.textContent = t.task_run_id + '（' + (t.visible_terminal || t.outcome) + '）';
+      sel.appendChild(opt);
+    }
+  }
+
+  function renderEnvelope(env, st) {
+    $('last-json').textContent = JSON.stringify({ envelope: env, ticket_total: st.ticket_total },
+                                                null, 2);
+  }
+  function bind() {
+    $('btn-reset').addEventListener('click', function () {
+      api('POST', '/api/reset', {}, function (d) {
+        renderCommon(d); $('last-json').textContent = '（已重置）'; $('trace-box').innerHTML = '';
+      });
+    });
+    $('btn-preview').addEventListener('click', function () {
+      api('POST', '/api/preview', {}, function (d) {
+        renderCommon(d.state); renderEnvelope(d.envelope, d.state);
+        verdict($('normal-verdict'), d.envelope.status === 'action_preview' ? 'ok' : 'bad',
+          d.envelope.status === 'action_preview'
+            ? '预览已生成（零效果）'
+            : '预览被策略拒绝');
+      });
+    });
+    $('btn-approve').addEventListener('click', function () {
+      api('POST', '/api/decide', { decision: 'approve' }, function (d) {
+        renderCommon(d.state);
+        verdict($('normal-verdict'), 'ok', '已批准（结构化审批绑定本任务，有效期 15 分钟）');
+      });
+    });
+    $('btn-execute').addEventListener('click', function () {
+      api('POST', '/api/execute', {}, function (d) {
+        renderCommon(d.state); renderEnvelope(d.envelope, d.state);
+        var env = d.envelope;
+        if (env.status === 'action_completed') {
+          verdict($('normal-verdict'), 'ok', 'action_completed：工单 ' + env.ticket_id +
+            ' 已由 ticket.get 独立核验（效果 +1）');
+        } else if (env.degraded) {
+          verdict($('normal-verdict'), 'warn', '停在 action_preview（' + env.reason_code +
+            '）：外部效果 0，审批未消耗 —— 这是安全降级，不是报错');
+          renderCopyBox(env);
+        } else {
+          verdict($('normal-verdict'), 'bad', '确定性错误: ' + env.error.code +
+            '（权限拒绝保持拒绝，未被降级吞掉）');
+        }
+      });
+    });
+    $('btn-inject').addEventListener('click', function () {
+      api('POST', '/api/fault', { action: 'inject' }, function (d) { renderCommon(d.state); });
+    });
+    $('btn-restore').addEventListener('click', function () {
+      api('POST', '/api/fault', { action: 'restore' }, function (d) {
+        renderCommon(d.state);
+        verdict($('normal-verdict'), 'ok', '依赖已恢复：可以点「续跑同一任务」');
+      });
+    });
+    $('btn-retry').addEventListener('click', function () {
+      api('POST', '/api/retry', {}, function (d) {
+        renderCommon(d.state); renderEnvelope(d.envelope, d.state);
+        verdict($('normal-verdict'), d.envelope.status === 'action_completed' ? 'ok' : 'bad',
+          d.envelope.status === 'action_completed'
+            ? '恢复复验通过：同一任务续跑 -> action_completed，工单 ' + d.envelope.ticket_id +
+              '（总数 ' + d.state.ticket_total + '，只 +1）'
+            : '续跑结果: ' + JSON.stringify(d.envelope));
+      });
+    });
+    $('btn-replay').addEventListener('click', function () {
+      api('POST', '/api/replay', {}, function (d) {
+        renderCommon(d.state); renderEnvelope(d.envelope, d.state);
+        verdict($('normal-verdict'), d.effect_count_unchanged ? 'ok' : 'bad',
+          d.effect_count_unchanged
+            ? '幂等重放安全：返回原工单 ' + (d.envelope.ticket_id || '(未创建)') +
+              '，工单总数仍 ' + d.ticket_total + '（无重复效果）'
+            : '警告：重放产生了新效果（应为 0）');
+      });
+    });
+    $('btn-switch-on').addEventListener('click', function () {
+      api('POST', '/api/switch', { action: 'set', operator: '业务用户(演示)',
+        reason: '页面演示：隔离 MCP 写通道' }, function (d) {
+        renderCommon(d.state);
+        verdict($('normal-verdict'), 'warn', 'MCP_OFF 已激活（审计已留痕）');
+      });
+    });
+    $('btn-switch-off').addEventListener('click', function () {
+      api('POST', '/api/switch', { action: 'clear', operator: '业务用户(演示)',
+        reason: '页面演示：按批准流程复位' }, function (d) {
+        renderCommon(d.state);
+        verdict($('normal-verdict'), 'ok', 'MCP_OFF 已按批准复位（审计已留痕）');
+      });
+    });
+    $('btn-drills').addEventListener('click', function () {
+      api('POST', '/api/drills', {}, function (d) {
+        renderCommon(d.state);
+        var rows = '';
+        for (var i = 0; i < d.drills.length; i++) {
+          var r = d.drills[i];
+          rows += '<tr><td><code>' + esc(r.drill_id) + '</code></td><td>' + esc(r.fault) +
+            '</td><td>' + esc(r.path) + '</td><td><code>' + esc(r.task_run_id) +
+            '</code></td><td>' + esc(r.visible_terminal) + '</td><td>' + r.effects +
+            '</td><td>' + (r.verdict === 'pass'
+              ? '<span class="badge ok">pass</span>'
+              : '<span class="badge bad">fail</span>') + '</td></tr>';
+        }
+        $('drills-table').innerHTML =
+          '<tr><th>段</th><th>故障</th><th>路径</th><th>task_run_id</th><th>终态</th><th>效果</th><th>结论</th></tr>' + rows;
+        verdict($('drills-verdict'), d.verdict === 'pass' ? 'ok' : 'bad',
+          d.verdict === 'pass'
+            ? '8 段全过：三类故障进预定义终态 + 恢复复验通过 + 遥测零违规'
+            : '演练失败：详情见后端 run_drills 输出');
+      });
+    });
+    $('btn-trace').addEventListener('click', function () {
+      var id = $('task-select').value;
+      if (!id) { window.__wbFatal('还没有任务'); return; }
+      api('GET', '/api/trace/' + encodeURIComponent(id), null, function (d) {
+        var rows = '';
+        for (var i = 0; i < d.spans.length; i++) {
+          var sp = d.spans[i];
+          rows += '<tr><td>' + esc(sp.stage) + '</td><td>' + esc(sp.result) +
+            (sp.not_applicable ? ' <span class="badge">n/a</span>' : '') +
+            '</td><td>' + esc(JSON.stringify(sp.versions)) + '</td><td>' +
+            esc(JSON.stringify(sp.safe_refs)) + '</td><td>' + sp.duration_ms + 'ms</td></tr>';
+        }
+        $('trace-box').innerHTML =
+          '<div class="verdict info">任务 <code>' + esc(d.task.task_run_id) + '</code> · 终态 <b>' +
+          esc(d.task.visible_terminal || d.task.outcome) + '</b> · 外部效果 ' + d.task.external_effects +
+          ' · ' + d.task.stage_count + ' 段</div>' +
+          '<table class="t"><tr><th>阶段</th><th>结果</th><th>版本链</th><th>安全引用</th><th>观测时长</th></tr>' +
+          rows + '</table>';
+      });
+    });
+    $('btn-redaction').addEventListener('click', function () {
+      api('POST', '/api/redaction-check', {}, function (d) {
+        verdict($('redaction-verdict'), d.passed ? 'ok' : 'bad',
+          d.verdict + '（检查事件 ' + d.checked_events + ' 条）');
+      });
+    });
+  }
+
+  function renderCopyBox(env) {
+    var box = $('copy-box');
+    if (!env || !env.canonical_parameters) { return; }
+    var p = env.canonical_parameters;
+    var text = '工单预览（尚未创建）\n案例: ' + p.case_id + '\n原因: ' + p.reason_code +
+      '\n引用: ' + p.source_refs.join(', ') + '\n队列: ' + p.target_queue +
+      '\n幂等键: ' + env.idempotency_key;
+    box.innerHTML = '<div class="verdict info">可复制预览（copy_preview -> submit_manually）：<pre>' +
+      esc(text) + '</pre></div>';
+  }
+
+  function init() {
+    bind();
+    api('GET', '/api/state', null, function (d) { renderCommon(d); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

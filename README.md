@@ -786,6 +786,95 @@ python -m unittest tests.test_telemetry_observability -v
 
 
 
+## 第 17 周：让依赖故障进入安全降级路径（关闭开关 × 降级终态 × 恢复复验）
+
+依据 `specs/business-background.md` 3889-4004，让**故障成为系统的正常状态**：
+模型超时、索引过期或 MCP 不可用时，用户必须得到**明确、权限安全、可以继续
+人工处理**的结果。核心纪律：权限拒绝保持拒绝（降级绝不吞掉确定性/权限错误）；
+写入结果不明确先对账；**任何降级路径继续走 ACL、审批、审计**；恢复复验看
+**任务结果与效果计数**，「只查进程/端口/健康接口不算完成」。本周只独立实现
+一种降级（MCP 不可用，手册 3955），模型/索引用固定演练观察（手册 3968）。
+
+- **故障行为合同**（`week-17/failure-behavior-contract-v1.md`）：三类故障 ×
+  七列表（MCP 不可用 → `action_preview`；索引过期 → `abstained`；模型超时 →
+  `system_failed`，本仓库等价机制=读路径 deadline 晚到结果整体作废）；
+  四类错误→动作映射；SLI 口径增补 v1.1 —— 可见终态词表 7→8（新增
+  **`action_preview` 降级停驻，允许终态**），`forbidden_effect_count` 扩展
+  覆盖降级终态（降级携带效果=合同违规，照抓不漏）；既有六类语义零改动
+  （week-16 基线/回放/12 用例零影响）。
+- **降级编排**（`mcptool/client.py`）：`_degradation_gate` 在写执行前判定 ——
+  判定优先级 允许列表→能力清单→schema→[审批当前有效]→降级→服务端；
+  两条路落同一安全终态：演练注入 `WriteChannelProbe`（探测恰 1 次=不重试，
+  服务端不被打扰）与关闭开关 `MCP_OFF`；降级封套 `degraded=true` +
+  `reason_code=mcp_unavailable` + `external_effect_count=0` +
+  `allowed_next_actions=[copy_preview, submit_manually, retry_later]` +
+  幂等键；**主缝不消耗审批**（恢复后同一审批直接续跑），纵深防御深层缝
+  （`UnavailableWriteTickets`）消耗如实入账、幂等键防重复效果。
+- **关闭开关登记**（`mcptool/kill_switch.py` + `week-17/kill-switch-registry-v1.md`）：
+  MCP_OFF（已接线）/MODEL_OFF/INDEX_STALE（登记+演练门）封闭枚举；
+  无因操作未批准；set/clear 追加式审计（operator/reason/at）；快照不可变；
+  复位必须按批准流程（恢复检查 #1）。
+- **固定演练与恢复复验**（`mcptool/run_degradation_drill.py` +
+  `week-17/degradation-drill-records-v1.md` + `week-17/recovery-verification-v1.md`）：
+  D-01..D-06 八段固定剧本（固定时钟/固定 task_run_id）：模型超时→
+  system_failed、索引过期→abstained、MCP 不可用（注入/开关两路）→
+  action_preview、恢复复验（同一 run_id+同一审批续跑恰 1 效果 + 幂等重放
+  无重复 + 受限任务仍拒绝）、第 15 周 A-06 对账回归。结果 7/8 allowed、
+  forbidden 0、效果合计恰 3、73 span 脱敏 0 违规；证据
+  `week-17/degradation-drill-evidence-v1.jsonl`（86 行）。
+- **业务用户交互工作台**（`workbench_degradation/`，端口 8017）：正常对照组 /
+  一键注入 / 开关 MCP_OFF / 续跑 / 幂等重放 / 8 段固定演练 / 任务追踪
+  （九阶段含降级段）/ 开关审计 / 脱敏检查 / 红线；每任务独立模拟 store、
+  开关与注入系统级保持；白话操作指南 `week-17/degradation-plain-guide-v1.md`、
+  验收脚本 `week-17/business-user-test-script-v1.md`（W-00..W-07）、
+  非作者复现 runbook `week-17/degradation-runbook-v1.md`。
+
+```
+week-17/failure-behavior-contract-v1.md           # 故障行为合同（七列表/决策规则/SLI 增补 v1.1）
+week-17/kill-switch-registry-v1.md                # 关闭开关登记（MCP_OFF 接线 + 审计纪律）
+week-17/degradation-drill-records-v1.md           # 三类故障固定演练记录（8 段全 pass）
+week-17/degradation-drill-evidence-v1.jsonl       # 演练机读证据（86 行, 已过脱敏扫描）
+week-17/recovery-verification-v1.md               # 恢复六检查→证据映射（不只查进程）
+week-17/degradation-runbook-v1.md                 # 非作者可复现 runbook（注入→复验全程）
+week-17/degradation-plain-guide-v1.md             # 业务用户白话操作指南（四轮演示）
+week-17/business-user-test-script-v1.md           # 业务用户验收脚本（W-00..W-07 + 记录单）
+mcptool/kill_switch.py                            # 关关注册表 + 写通道注入缝（attempts 证不重试）
+mcptool/run_degradation_drill.py                  # 固定演练运行器（D-01..D-06）
+workbench_degradation/app.py                      # 降级工作台薄壳（注入/开关/续跑/重放/演练）
+workbench_degradation/static/index.html           # 中文前台页面（原生 ES5 兜底 + 主脚本）
+start_workbench_degradation.bat                   # 交付人双击启动（端口 8017, 自动打开浏览器）
+tests/test_degradation_week17.py                  # 16 个降级用例（全量 106 -> 122）
+```
+
+### 第 17 周验证方式
+
+```powershell
+# 业务用户交互工作台（无命令行测试入口）
+start_workbench_degradation.bat           # 双击启动, 打开 http://127.0.0.1:8017
+
+# 8 段固定演练（三类故障 + 恢复复验; 退出码 0 = 全 pass + 脱敏零违规）
+python -m mcptool.run_degradation_drill --out week-17/degradation-drill-evidence-v1.jsonl
+
+# 降级与关闭开关测试（封套合同/权限优先/恢复复验/工作台 API 端到端）
+python -m unittest tests.test_degradation_week17 -v
+```
+
+### 第 17 周结果要点与边界（诚实不夸大）
+
+演练 8 段全 pass：D-01 模型超时→system_failed（0 效果）、D-02 索引过期→
+abstained（0 效果）、D-03/D-04 MCP 不可用（注入/开关两路）→action_preview
+（0 效果、审批不消耗、探测恰 1 次）、D-05a/b 恢复续跑恰 1 效果 + 幂等重放
+无重复、D-05c 受限任务仍拒绝、D-06 A-06 对账回归；allowed 7/8、
+forbidden_effect_count 0、效果合计恰 3、73 段 span 脱敏 0 违规。全量测试
+106 → 122 全绿；`ci/redaction_scan.py` SCOPE_FILES 44 → 48（kill_switch/
+演练运行器/降级工作台 4 文件入列，零违规）。**边界**：降级编排是教学进程内
+实现（无熔断器/重试预算工程件）；MODEL_OFF/INDEX_STALE 只登记 + 演练门，
+不改生产读路径（手册 3968）；「模型超时→system_failed」是纪律等价映射
+而非 partial 终端复刻；开关批准=操作人+理由留痕，真实系统需双人在岗与
+冷静期；不提前做第 18 周冷交接。
+
+
+
 
 
 
