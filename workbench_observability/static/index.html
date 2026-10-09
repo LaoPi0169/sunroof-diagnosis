@@ -59,6 +59,26 @@
 </style>
 </head>
 <body>
+<script>
+/* 兜底哨兵（ES5）: 主脚本若解析/执行失败, 顶部显示可见红条 —— 业务用户不面对沉默失灵的按钮 */
+window.__wbFatal = function (msg) {
+  var bar = document.getElementById('js-error-bar');
+  if (!bar && document.body) {
+    bar = document.createElement('div');
+    bar.id = 'js-error-bar';
+    bar.style.cssText = 'background:#fdecea;border-bottom:1px solid #f5c6c0;color:#c0392b;'
+      + 'padding:10px 16px;font:13px/1.6 "Microsoft YaHei",sans-serif;';
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+  if (bar) {
+    bar.style.display = 'block';
+    bar.textContent = '页面脚本异常: ' + msg + '　—— 请改用新版 Edge / Chrome 并按 Ctrl+F5 刷新; 仍失败请联系交付人。';
+  }
+};
+window.addEventListener('error', function (e) {
+  if (e && e.message) { window.__wbFatal(String(e.message)); }
+});
+</script>
 <header>
   <button id="btn-reset">重置演示环境</button>
   <h1>两种体温计 —— 离线考卷金丝雀 × 运行期 SLI（第 16 周交付）</h1>
@@ -140,6 +160,8 @@
   </div>
 </main>
 <script>
+// ---- 后端调用（薄封装: 失败时抛出后端 detail/error 信息） ----
+async function api(path, method) {
   const res = await fetch(path, {method: method || 'GET',
     headers: {'Content-Type': 'application/json'},
     body: method === 'POST' ? '{}' : undefined});
