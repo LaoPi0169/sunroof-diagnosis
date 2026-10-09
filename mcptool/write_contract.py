@@ -1,8 +1,14 @@
-"""ticket.* 写工具合同 (Week 14) —— 回链 week-14/ticket-write-contract-v1.json。
+"""ticket.* 写工具合同 (Week 14 + Week 15 对抗增量) —— 回链 week-15/ticket-write-contract-v2.json。
 
 唯一允许的外部效果: 在隔离模拟工单服务为指定工单创建 1 张主管复核单
 (effect = create_one_review_ticket, 等级 write_once_reversible)。
-硬门: 无审批 / 审批过期 / 身份或参数不匹配 -> 外部效果数必须为 0。
+硬门: 无审批 / 审批过期/撤销 / 能力隔离 / 身份或参数不匹配 -> 外部效果数必须为 0。
+
+Week 15 增量 (A-01..A-07, specs/business-background.md 3438-3665):
+  - 审批执行前可撤销: approval_revoked 错误码 + ApprovalService.revoke (追加式);
+  - 工具描述/参数模式摘要门: capability_quarantined 错误码 + capability_manifest 模块;
+  - 写后断连: result_unknown 编排状态 + reconciliation_pending (先查后说, 禁止伪造终态);
+  - 运营补偿: cancel_ticket 仅 ops_admin, 不进模型目录 (见 ticket_service)。
 
 三条物理边界 (模块切分, 手册 3360-3364):
   - write_contract (本模块): 参数封闭 schema + 单一规范化函数 —— 预览/审批/执行
@@ -27,7 +33,7 @@ def iso_plus_seconds(iso_str: str, seconds: int) -> str:
     moment = datetime.strptime(iso_str, ISO_FORMAT)
     return (moment + timedelta(seconds=seconds)).strftime(ISO_FORMAT)
 
-# ---- 三件写工具 (Host 允许列表 1 -> 4; 读工具仍走原通道) ----
+# ---- 三件写工具 (Host 允许列表 1 -> 4; 读工具仍走原通道; cancel 不入列) ----
 TOOL_PREVIEW = "ticket.preview_create"
 TOOL_CREATE = "ticket.create"
 TOOL_GET = "ticket.get"
@@ -38,9 +44,10 @@ EFFECT = "create_one_review_ticket"
 EFFECT_CLASS = "write_once_reversible"
 SERVER_IDENTITY = "northstar-mcptool-ticket-server@local"
 
-# 合同冻结互锁 (week-14/ticket-write-contract-v1.json 字节级 sha256;
-# 任一方改动而另一方未同步, 互锁测试即失败 —— 照第 13 周合同冻结模式)
-CONTRACT_SHA256 = "486b93623135c2f12feb17649340d2b351f2d8002a8ea177eb9c59b906b1b9b4"
+# 合同冻结互锁 (week-15/ticket-write-contract-v2.json 字节级 sha256;
+# 任一方改动而另一方未同步, 互锁测试即失败; week-14 v1 冻结物一字节不动,
+# 其摘要 486b9362…b1b9b4 由 tests/test_mcp_adversarial.py 锁定)
+CONTRACT_SHA256 = "f9afabdc2efdab5e10c20dda23a2d64b16223b88cc443bdcabffa1a65fe931f4"
 
 # ---- 参数封闭 schema (四键; additional_properties=reject) ----
 WRITE_ARGUMENT_KEYS = ("case_id", "reason_code", "source_refs", "target_queue")
@@ -55,14 +62,16 @@ SOURCE_REFS_MIN, SOURCE_REFS_MAX = 1, 2
 RESULT_LIMIT_TICKETS_PER_APPROVAL = 1
 DEADLINE_MS = 800  # 写路径 deadline 宽于读路径 500ms (写含核验再读)
 
-# ---- 结果封套状态 (状态机见 week-14/state-and-effect-map.md) ----
+# ---- 结果封套状态 (状态机见 week-15/ticket-write-contract-v2.json terminals) ----
 STATUS_PREVIEW = "action_preview"        # 0 个外部效果
 STATUS_DENIED = "approval_denied"        # 安全终态, 0 个外部效果
 STATUS_COMPLETED = "action_completed"    # 已由 ticket.get 独立核验, 1 个效果
-# result_unknown 保留 (写后断连对账留第 15 周): 本周实现确定性成功/拒绝/过期/
-# 不匹配/重放, 不把 unknown 折叠成失败后盲重试。
+STATUS_UNKNOWN = "result_unknown"        # 写后断连: 已提交、结果未核验 (A-06)
+STATUS_RECONCILIATION_PENDING = "reconciliation_pending"  # 对账未完成: 禁止伪造终态
+RECONCILIATION_PENDING_MESSAGE = ("写请求已提交但结果未确认，系统保持对账状态；"
+                                  "确认前不会重试创建，也不会伪造完成")
 
-# ---- 错误八类 (与合同 JSON error_taxonomy 同值互锁) ----
+# ---- 错误十类 (与合同 JSON error_taxonomy 同值互锁; v1 八类 + v2 两类) ----
 ERROR_INVALID_ARGUMENT = "invalid_argument"
 ERROR_NOT_AVAILABLE = "not_available"
 ERROR_DEADLINE_EXCEEDED = "deadline_exceeded"
@@ -71,6 +80,8 @@ ERROR_APPROVAL_EXPIRED = "approval_expired"
 ERROR_APPROVAL_MISMATCH = "approval_mismatch"
 ERROR_CONTRACT_VIOLATION = "contract_violation"
 ERROR_VERSION_MISMATCH = "version_mismatch"
+ERROR_APPROVAL_REVOKED = "approval_revoked"                # v2: 执行前撤销 (A-04)
+ERROR_CAPABILITY_QUARANTINED = "capability_quarantined"    # v2: 描述/模式摘要隔离 (A-02/A-05)
 ERROR_CODES = (
     ERROR_INVALID_ARGUMENT,
     ERROR_NOT_AVAILABLE,
@@ -80,6 +91,8 @@ ERROR_CODES = (
     ERROR_APPROVAL_MISMATCH,
     ERROR_CONTRACT_VIOLATION,
     ERROR_VERSION_MISMATCH,
+    ERROR_APPROVAL_REVOKED,
+    ERROR_CAPABILITY_QUARANTINED,
 )
 
 # ---- 用户面安全文案 (细分原因只进受限审计; 不泄露审批内部细节) ----
@@ -92,6 +105,8 @@ SAFE_MESSAGES = {
     ERROR_APPROVAL_MISMATCH: "审批与本次动作不匹配，已拒绝执行",
     ERROR_CONTRACT_VIOLATION: "结果超出合同，已整体拒绝并记录安全事件",
     ERROR_VERSION_MISMATCH: "工具版本不兼容，本次调用已停用",
+    ERROR_APPROVAL_REVOKED: "审批已被撤销，本次执行已停止",
+    ERROR_CAPABILITY_QUARANTINED: "工具能力与冻结清单不符，已隔离停用",
 }
 
 # ---- 审批绑定字段 (执行前逐项重读比对; 任一实质变化即原审批失效) ----

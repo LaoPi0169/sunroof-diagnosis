@@ -2,7 +2,7 @@
 审批写工具测试 (Week 14) —— 回链 specs/mission-week-14.md 验收标准
 
 覆盖十二项:
-  01 合同/常量/策略三方互锁 (工具三元组/版本/效果/错误八类/队列枚举/绑定字段/审批策略值/sha256)
+  01 合同/常量/策略三方互锁 (工具三元组/版本/效果/错误十类/队列枚举/绑定字段/审批策略值/v2 合同 sha256)
   02 无副作用预览: preview 后模拟服务计数 0 + 只读库快照不变 + 失控预览非零计数被 Host 硬门拦截
   03 schema 封闭: 走私身份键/未知字段/approval_id 走私/非法原因码/未知队列/空引用 全拒 (未到服务端)
   04 W-01 无审批 -> approval_required, 0 效果
@@ -37,8 +37,10 @@ from mcptool.policy import WritePolicy
 from mcptool.ticket_service import TicketService
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEEK14_DIR = os.path.join(PROJECT_ROOT, "week-14")
-CONTRACT_PATH = os.path.join(WEEK14_DIR, "ticket-write-contract-v1.json")
+WEEK15_DIR = os.path.join(PROJECT_ROOT, "week-15")
+# 第 15 周: 互锁基准演进为 v2 合同 (撤销/能力清单门/断连对账; 错误八类 -> 十类);
+# week-14 v1 冻结物一字节不动, 其摘要由 tests/test_mcp_adversarial.py 锁定。
+CONTRACT_PATH = os.path.join(WEEK15_DIR, "ticket-write-contract-v2.json")
 FIXED_NOW = "2026-10-08T00:00:00Z"
 AGENT_SESSION = TrustedSession(
     "northstar-training", "user-zhou-ning", "support_agent")
@@ -387,10 +389,10 @@ class McpWriteToolTest(unittest.TestCase):
         # 用户面封套不含批准载荷/审批内部细节 (载荷只存审批记录, 记录属受限面)
         self.assertNotIn("approved_parameters", emitted)
         self.assertNotIn("policy_version", emitted)
-        # CI STAGE-3 同源扫描: 34 文件全绿 (新写模块入列)
+        # CI STAGE-3 同源扫描: 39 文件全绿 (第 15 周能力清单模块 + 对抗工作台入列)
         report = scan.scan()
         self.assertTrue(report["passed"], report["violations"])
-        self.assertGreaterEqual(report["scanned_files"], 34)
+        self.assertGreaterEqual(report["scanned_files"], 39)
         # 受限审计含细分原因与效果增量 (审计不等于普通日志; 引用须标注 restricted)
         host, tickets, approvals, policy = _fresh_stack()
         _approve_and_execute(host, tickets, approvals, policy)
