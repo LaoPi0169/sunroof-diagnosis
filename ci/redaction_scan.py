@@ -23,8 +23,8 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 扫描范围 (运行时代码, 不含 tests/ 与 docs); Week 16: 39 -> 44
-# (telemetry / run_canary / run_telemetry_replay + 可观测性工作台 2 文件)
+# 扫描范围 (运行时代码, 不含 tests/ 与 docs); Week 17: 44 -> 48
+# (kill_switch / run_degradation_drill + 降级工作台 2 文件)
 SCOPE_FILES = [
     os.path.join("application", "auth.py"),
     os.path.join("application", "database.py"),
@@ -70,6 +70,10 @@ SCOPE_FILES = [
     os.path.join("mcptool", "run_telemetry_replay.py"),
     os.path.join("workbench_observability", "__init__.py"),
     os.path.join("workbench_observability", "app.py"),
+    os.path.join("mcptool", "kill_switch.py"),
+    os.path.join("mcptool", "run_degradation_drill.py"),
+    os.path.join("workbench_degradation", "__init__.py"),
+    os.path.join("workbench_degradation", "app.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

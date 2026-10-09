@@ -48,6 +48,9 @@ STAGES = (
 )
 
 # ---- 六类可见终态 (week-16/runtime-sli-spec-v1.md 状态对照表的输出词表) ----
+# v1.1 增补 (第 17 周): TERMINAL_ACTION_PREVIEW —— 降级停驻终态 (手册 3924:
+# MCP 不可用 -> action_preview)。增补详见 week-17/failure-behavior-contract-v1.md
+# 「SLI 口径增补」; 既有六类语义一字未动 (week-16 基线/回放不受影响)。
 TERMINAL_ANSWERED = "answered"
 TERMINAL_ABSTAINED = "abstained"
 TERMINAL_ESCALATED = "escalated"
@@ -55,17 +58,23 @@ TERMINAL_APPROVAL_DENIED = "approval_denied"
 TERMINAL_APPROVAL_REVOKED = "approval_revoked"
 TERMINAL_ACTION_COMPLETED = "action_completed"
 TERMINAL_SYSTEM_FAILED = "system_failed"
+TERMINAL_ACTION_PREVIEW = "action_preview"
 VISIBLE_TERMINALS = (
     TERMINAL_ANSWERED, TERMINAL_ABSTAINED, TERMINAL_ESCALATED,
     TERMINAL_APPROVAL_DENIED, TERMINAL_APPROVAL_REVOKED,
     TERMINAL_ACTION_COMPLETED, TERMINAL_SYSTEM_FAILED,
+    TERMINAL_ACTION_PREVIEW,
 )
 # 允许终态 = 业务上「正常走完或安全停住」; system_failed 诚实记录但不计入通过率分子
 ALLOWED_TERMINALS = (
     TERMINAL_ANSWERED, TERMINAL_ABSTAINED, TERMINAL_ESCALATED,
     TERMINAL_APPROVAL_DENIED, TERMINAL_APPROVAL_REVOKED,
-    TERMINAL_ACTION_COMPLETED,
+    TERMINAL_ACTION_COMPLETED, TERMINAL_ACTION_PREVIEW,
 )
+
+# 遥测层的降级停驻 outcome (与用户面封套 status=action_preview 同义区分:
+# 正常流程中 finish("action_preview") 从不出现, 降级停驻用独立词避免歧义)
+TRACE_OUTCOME_PREVIEW_HELD = "action_preview_held"
 
 # week-12 四态期望词表 -> 六类可见终态 (refused/needs_review 用户可见都是「拒答」)
 RAG_STATE_TO_VISIBLE = {
@@ -93,12 +102,16 @@ def classify_terminal(kind: str, outcome):
     """内部封套状态 -> (可见终态或 None, 是否允许终态)。
 
     kind ∈ {"read", "write"}; outcome = RAG mapped_state / 封套 status / 错误码。
-    返回 None = 非终态: 预览、result_unknown、reconciliation_pending、写超时
-    (外部效果未确认 -> 先对账, 不是失败也不是成功)。
+    返回 None = 非终态: result_unknown、reconciliation_pending、写超时
+    (外部效果未确认 -> 先对账, 不是失败也不是成功); 正常流程的预览也是非终态。
+    v1.1 (第 17 周): 降级停驻 outcome=action_preview_held -> 允许终态
+    action_preview (手册 3924: MCP 不可用停在预览是合格结果, 不是失败)。
     """
     if kind == "write":
         if outcome == W.STATUS_COMPLETED:
             return TERMINAL_ACTION_COMPLETED, True
+        if outcome == TRACE_OUTCOME_PREVIEW_HELD:
+            return TERMINAL_ACTION_PREVIEW, True
         if outcome == W.STATUS_DENIED:
             return TERMINAL_APPROVAL_DENIED, True
         if outcome == W.ERROR_APPROVAL_REVOKED:
@@ -237,7 +250,9 @@ def reduce_runtime_metrics(traces) -> dict:
         if allowed:
             allowed_numerator += 1
         if visible in (TERMINAL_APPROVAL_DENIED, TERMINAL_APPROVAL_REVOKED,
-                       TERMINAL_SYSTEM_FAILED):
+                       TERMINAL_SYSTEM_FAILED, TERMINAL_ACTION_PREVIEW):
+            # v1.1 (第 17 周): 降级停驻 (action_preview) 携带任何效果增量同样是
+            # 合同违规 —— 「停在预览」的定义就是 0 外部效果, 违规必须被 SLI 抓住。
             forbidden_effect_count += trace.effects
     total = len(traces)
     return {

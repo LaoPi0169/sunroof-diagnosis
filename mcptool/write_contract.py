@@ -71,6 +71,15 @@ STATUS_RECONCILIATION_PENDING = "reconciliation_pending"  # 对账未完成: 禁
 RECONCILIATION_PENDING_MESSAGE = ("写请求已提交但结果未确认，系统保持对账状态；"
                                   "确认前不会重试创建，也不会伪造完成")
 
+# ---- 第 17 周降级停驻 (用户面封套增补; 回链 week-17/failure-behavior-contract-v1.md) ----
+# MCP 不可用 (演练注入或 MCP_OFF 关闭开关) 时写编排停在预览: 同一规范化参数原样
+# 保留, 外部效果恒 0, 审批不在此消耗 (深层缝除外, 见 client._degraded_preview),
+# 用户可复制预览走人工流程, 或稍后用同一幂等键续跑 (不自动重试, 决策留给用户)。
+REASON_MCP_UNAVAILABLE = "mcp_unavailable"                # 用户面细分原因码 (唯一)
+ALLOWED_NEXT_ACTIONS = ("copy_preview", "submit_manually", "retry_later")
+DEGRADED_PREVIEW_MESSAGE = ("写通道暂不可用：工单预览已保留但尚未创建；"
+                            "可复制预览走人工流程提交，或稍后重试")
+
 # ---- 错误十类 (与合同 JSON error_taxonomy 同值互锁; v1 八类 + v2 两类) ----
 ERROR_INVALID_ARGUMENT = "invalid_argument"
 ERROR_NOT_AVAILABLE = "not_available"
