@@ -1,0 +1,48 @@
+{
+  "project": "sunroof-diagnosis",
+  "node": "03 可靠数据入口",
+  "generated_by": "verify_node03.py",
+  "batch_summary": {
+    "batch_id": "batch-node03-verify",
+    "source_id": "qms-export-w40-2026",
+    "total_rows": 3,
+    "accepted_count": 1,
+    "duplicate_count": 1,
+    "quarantined_count": 1,
+    "status": "completed_with_quarantine",
+    "is_idempotent_rerun": true,
+    "quarantine_summary": {
+      "DUPLICATE_BUSINESS_KEY": 1,
+      "MISSING_OWNER": 1
+    }
+  },
+  "three_way_reconciliation": {
+    "batch_id": "batch-node03-verify",
+    "total_input_rows": 3,
+    "recorded_accepted": 1,
+    "recorded_duplicate": 1,
+    "recorded_quarantined": 1,
+    "accepted_in_specs_table": 1,
+    "quarantined_in_quarantine_table": 2,
+    "three_way_consistent": true
+  },
+  "targeted_replay_execution": {
+    "replay_id": "rep-48d4ab8a5d",
+    "quarantine_id": "quar-b204c75d3ce6",
+    "status": "success",
+    "accepted_spec_id": "SPEC-SR-A-V6"
+  },
+  "engine_regression_check": {
+    "before": {
+      "request_id": "verify-node03-001",
+      "status": "answered",
+      "matched_spec_id": "SPEC-SR-A-V5"
+    },
+    "after": {
+      "request_id": "verify-node03-002",
+      "status": "needs_review",
+      "reason_code": "SPEC_CONFLICT"
+    }
+  },
+  "all_checks_passed": true
+}
