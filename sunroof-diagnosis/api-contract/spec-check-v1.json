@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spec-check-v1",
+  "title": "POST /api/v1/spec-check 请求契约 (阶段 A 节点 02 冻结, 回链 vertical-slice-contract.md)",
+  "description": "天窗总成装配规格核对: 封闭 Schema, 请求体不得出现身份字段, 未知字段一律 422",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "task_type", "sn", "part_no", "process_step", "measured_at", "measured_value"],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "三向对账键: API 响应 / DB task_runs / 测试断言共用"
+    },
+    "task_type": {
+      "const": "spec_check",
+      "description": "任务类型, 阶段 A 唯一取值"
+    },
+    "sn": {
+      "type": "string",
+      "minLength": 1,
+      "description": "天窗总成 SN (追溯标识, 仅随审计留痕)"
+    },
+    "part_no": {
+      "type": "string",
+      "minLength": 1,
+      "description": "零件业务键, 如 MOTOR-MOUNT-BOLT-03 (确定性匹配键之一)"
+    },
+    "process_step": {
+      "enum": ["torque_tightening", "gap_check"],
+      "description": "工序封闭枚举: 拧紧扭矩 / 装配间隙"
+    },
+    "measured_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "测量日期 (ISO-8601 YYYY-MM-DD), 规格生效窗口判定键"
+    },
+    "measured_value": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "实测值 (N·m 或 mm, 按工序), 偏差与硬限判定的输入"
+    }
+  }
+}
