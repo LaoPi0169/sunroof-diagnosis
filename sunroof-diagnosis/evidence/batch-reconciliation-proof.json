@@ -27,8 +27,8 @@
     "three_way_consistent": true
   },
   "targeted_replay_execution": {
-    "replay_id": "rep-e0da1c5f35",
-    "quarantine_id": "quar-7a7af570e717",
+    "replay_id": "rep-1b1b9f21f6",
+    "quarantine_id": "quar-624ef46aafb2",
     "status": "success",
     "accepted_spec_id": "SPEC-SR-A-V6"
   },

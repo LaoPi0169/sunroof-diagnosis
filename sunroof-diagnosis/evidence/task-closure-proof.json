@@ -1,0 +1,47 @@
+{
+  "project": "sunroof-diagnosis",
+  "node": "04 双角色任务闭环",
+  "generated_by": "verify_node04.py",
+  "closure_checks": {
+    "normal_closure": {
+      "task_id": "TASK-N04-001",
+      "check_spec_status": "answered",
+      "matched_spec_id": "SPEC-SR-A-V5",
+      "deviation_pct": 1.05,
+      "confirm_status": "confirmed",
+      "action_runs": [
+        "check_spec",
+        "confirm"
+      ],
+      "node02_task_runs_lineage": "answered"
+    },
+    "hard_limit_block_and_idempotent_escalate": {
+      "task_id": "TASK-N04-002",
+      "check_spec_reason": "SPEC_HARD_LIMIT_EXCEEDED",
+      "candidate_spec_leaked": false,
+      "replay_reason": "ALREADY_APPLIED",
+      "replay_is_idempotent": true
+    },
+    "rbac_one_vote_veto": {
+      "task_id": "TASK-N04-002",
+      "pqe_supervisor_resolve_status": "denied",
+      "reason_code": "ACTION_NOT_ALLOWED",
+      "task_state_unchanged": true
+    },
+    "supervisor_resolution_three_way": {
+      "task_id": "TASK-N04-002",
+      "response_status": "action_completed",
+      "db_status": "action_completed",
+      "audit_status": "action_completed",
+      "resolved_by": "supervisor_li"
+    },
+    "cross_project_denial_zero_leak": {
+      "task_id": "TASK-N04-001",
+      "requester": "pqe_zhao_oemb (OEM-B)",
+      "status": "denied",
+      "case_id_echo": "N/A-ACL-DENIED",
+      "task_state_unchanged": true
+    }
+  },
+  "all_checks_passed": true
+}

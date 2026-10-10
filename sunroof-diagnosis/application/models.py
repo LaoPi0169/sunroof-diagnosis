@@ -88,3 +88,75 @@ class SpecCheckResponse(BaseModel):
     evaluation: Optional[SpecEvaluation] = None
     reason_code: Optional[ReasonCodeEnum] = None
     reviewer_preview: Optional[ReviewPreview] = None
+
+
+# ============================================================================
+# 节点 04 双角色任务闭环 DTO (回链 specs/role-and-permission-matrix.md §2:
+# 冲突/硬限裁决.人工复核 —— PQE 发起 (needs_review), 质量主管原系统人工裁决)
+# 设计要点: TaskActionRequest 使用 extra="forbid" 封闭契约 —— 请求体自报
+# role/身份字段直接 422，身份只允许来自服务端可信会话 (X-Auth-Token)。
+# ============================================================================
+
+
+class TaskStatus(str, Enum):
+    """任务状态机 (task-state-model.md)"""
+    INITIALIZED = "initialized"
+    ANSWERED = "answered"
+    NEEDS_REVIEW = "needs_review"
+    CONFIRMED = "confirmed"
+    REFUSED = "refused"
+    ESCALATED = "escalated"
+    DENIED = "denied"                # 仅存在于动作审计 (越权阻断)，不改变任务状态
+    ACTION_COMPLETED = "action_completed"
+
+
+class TaskAction(str, Enum):
+    """任务动作 (服务端 RBAC 授权的最小单元)"""
+    CHECK_SPEC = "check_spec"        # 100% 复用节点 02 确定性引擎 (adr-003 D5)
+    CONFIRM = "confirm"
+    REFUSE = "refuse"                # 显式拒绝也是留痕终态 (不猜答案)
+    ESCALATE = "escalate"
+    SUPERVISOR_RESOLVE = "supervisor_resolve"
+
+
+class TaskActionReasonCode(str, Enum):
+    """任务动作的结构化原因码 (异常分支与节点 02 判定表同码, 零映射分叉)"""
+    SUPPORTED_CURRENT_SOURCES = "SUPPORTED_CURRENT_SOURCES"
+    SPEC_HARD_LIMIT_EXCEEDED = "SPEC_HARD_LIMIT_EXCEEDED"
+    NO_MATCHING_SPEC = "NO_MATCHING_SPEC"
+    SPEC_CONFLICT = "SPEC_CONFLICT"
+    SPECIAL_TASK_REQUIRES_REVIEW = "SPECIAL_TASK_REQUIRES_REVIEW"
+    ALREADY_APPLIED = "ALREADY_APPLIED"
+    ACTION_NOT_ALLOWED = "ACTION_NOT_ALLOWED"
+    REFUSED_BY_AGENT = "REFUSED_BY_AGENT"
+    INVALID_TASK_STATE = "INVALID_TASK_STATE"
+
+
+class TaskActionRequest(BaseModel):
+    """任务动作请求 Schema (身份绝不来自本请求体)"""
+    model_config = ConfigDict(extra="forbid")  # 自报 role 等未知字段直接 422
+
+    task_id: str = Field(..., description="任务标识")
+    action: TaskAction = Field(..., description="任务动作")
+    correlation_id: str = Field(..., description="全局关联标识 (三向对账键)")
+    reason_code: Optional[TaskActionReasonCode] = Field(
+        default=None, description="escalate 可选自定义原因码 (缺省继承任务当前原因)"
+    )
+    idempotency_key: Optional[str] = Field(
+        default=None, description="升级动作幂等键 (重复提交返回 ALREADY_APPLIED)"
+    )
+
+
+class TaskResponse(BaseModel):
+    """任务动作统一响应 Schema (denied/needs_review 时 candidate_spec 恒为 None —— 零泄漏)"""
+    task_id: str
+    case_id: str
+    status: TaskStatus
+    reason_code: Optional[TaskActionReasonCode] = None
+    candidate_spec: Optional[SpecDetails] = None
+    evaluation: Optional[SpecEvaluation] = None
+    escalation_preview: Optional[ReviewPreview] = None
+    allowed_actions: List[TaskAction] = []
+    correlation_id: str
+    message: Optional[str] = None
+    is_idempotent: bool = False

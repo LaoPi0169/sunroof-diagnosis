@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
-from application.models import TrustedUser
+from application.models import TaskAction, TrustedUser
 
 
 def get_trusted_user_from_session(x_auth_token: Optional[str] = Header(None)) -> TrustedUser:
@@ -39,3 +39,28 @@ def get_trusted_user_from_session(x_auth_token: Optional[str] = Header(None)) ->
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
         )
+
+
+# ============================================================================
+# 节点 04 双角色 RBAC 授权矩阵 (role-and-permission-matrix.md §2) 的服务端最小实现:
+#   * pqe (项目组内一线): check_spec / confirm / refuse / escalate;
+#     supervisor_resolve 为质量主管专属 —— PQE 直调走 denied 路径 (零泄漏 + 审计留痕);
+#   * quality_supervisor: 显式允许全部动作 (跨项目只读 + 主管复核结案);
+#   * 其他角色/未知角色默认拒绝 (Default-Deny)。
+# =====================================================================
+
+PQE_ALLOWED_ACTIONS = {
+    TaskAction.CHECK_SPEC,
+    TaskAction.CONFIRM,
+    TaskAction.REFUSE,
+    TaskAction.ESCALATE,
+}
+
+
+def authorize_action(user: TrustedUser, action: TaskAction) -> bool:
+    """服务端一票否决: 判定 (user_role, action) 是否放行; 默认拒绝 (Default-Deny)"""
+    if user.user_role == "quality_supervisor":
+        return True
+    if user.user_role == "pqe":
+        return action in PQE_ALLOWED_ACTIONS
+    return False

@@ -21,8 +21,13 @@ _DEFAULT_DB_PATH = os.path.join(
 )
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "migrations")
-# 迁移脚本按序执行 (001 = 节点 02 基线 DDL + Fixtures; 002 = 节点 03 摄取/隔离/重放表)
-MIGRATION_SCRIPTS = ["001_init_schema.sql", "002_ingestion_schema.sql"]
+# 迁移脚本按序执行 (001 = 节点 02 基线 DDL + Fixtures; 002 = 节点 03 摄取/隔离/重放表;
+#                    003 = 节点 04 任务表 + 任务动作审计表 + 任务夹具)
+MIGRATION_SCRIPTS = [
+    "001_init_schema.sql",
+    "002_ingestion_schema.sql",
+    "003_tasks_and_permissions_schema.sql",
+]
 
 # 节点 03 血缘列: 通过幂等 ALTER 追加到 001 已冻结的 specs 表，
 # 不重建表、不改动既有主键 (spec_id) 与六条种子 Fixtures (回链 specs/data-contract-v1.md §8)
@@ -174,5 +179,105 @@ def get_task_run_by_request_id(request_id: str) -> Optional[Dict[str, Any]]:
         cursor.execute("SELECT * FROM task_runs WHERE request_id = ?", (request_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# 节点 04: 任务闭环数据访问 (spec_check_tasks + task_action_runs)
+# 三向对账锚点: HTTP 响应 (correlation_id) / spec_check_tasks 终态 / task_action_runs 流水
+# ============================================================================
+
+def get_spec_check_task(task_id: str) -> Optional[Dict[str, Any]]:
+    """按 task_id 读取任务终态 (任务状态机的唯一事实来源)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM spec_check_tasks WHERE task_id = ?", (task_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_spec_check_tasks() -> List[Dict[str, Any]]:
+    """列出全部任务 (工作台任务队列数据源; 端点层按用户 ACL 过滤后返回)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM spec_check_tasks ORDER BY created_at ASC, task_id ASC"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def update_task_state(
+    task_id: str,
+    status: str,
+    reason_code: Optional[str] = None,
+    matched_spec_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+) -> None:
+    """写入任务终态 (单事务); None 字段用 COALESCE 保留原值，保证幂等重放不覆盖既有依据"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE spec_check_tasks
+            SET status = ?,
+                reason_code = COALESCE(?, reason_code),
+                matched_spec_id = COALESCE(?, matched_spec_id),
+                idempotency_key = COALESCE(?, idempotency_key),
+                updated_at = datetime('now')
+            WHERE task_id = ?
+            """,
+            (status, reason_code, matched_spec_id, idempotency_key, task_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_task_action_run(
+    task_id: str,
+    correlation_id: str,
+    user_id: str,
+    user_role: str,
+    action: str,
+    status: str,
+    reason_code: Optional[str] = None,
+) -> str:
+    """记录一条任务动作审计事件 (三向对账锚点: 响应 / spec_check_tasks / 本表)"""
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO task_action_runs
+                (run_id, task_id, correlation_id, user_id, user_role, action, status, reason_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (run_id, task_id, correlation_id, user_id, user_role, action, status, reason_code),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return run_id
+
+
+def get_task_action_runs_by_correlation(correlation_id: str) -> List[Dict[str, Any]]:
+    """按 correlation_id 汇集动作审计流水，供 E2E 测试三向对账断言 (按插入序 rowid 排序)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM task_action_runs WHERE correlation_id = ? ORDER BY rowid ASC",
+            (correlation_id,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
     finally:
         conn.close()
