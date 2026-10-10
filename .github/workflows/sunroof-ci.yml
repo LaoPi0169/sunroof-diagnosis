@@ -1,0 +1,42 @@
+name: sunroof-week08-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ['sunroof-diagnosis/**', '.github/workflows/sunroof-ci.yml']
+  pull_request:
+    paths: ['sunroof-diagnosis/**', '.github/workflows/sunroof-ci.yml']
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sunroof-diagnosis
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 四阶段流水线: Schema 检查 -> 全量测试 -> 日志脱敏扫描 -> 干净环境任务冒烟
+      # 与 sunroof-diagnosis/ci/run_local_ci.py 完全同一入口 (本地复跑 = CI 复跑,
+      # 证据可对照 sunroof-diagnosis/ci-evidence.md)
+      - name: Run CI pipeline (schema + tests + redaction + clean-env smoke)
+        run: python ci/run_local_ci.py
+
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunroof-ci-evidence-log
+          path: sunroof-diagnosis/evidence/ci-run-w08.log
+          if-no-files-found: ignore

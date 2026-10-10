@@ -1,0 +1,61 @@
+{
+  "drill_version": "sunroof-rollback-drill-v1",
+  "release_id": "sunroof-app-w08-r0",
+  "config_known_good": "sunroof-config-w08-v1",
+  "config_injected_bad": "sunroof-config-w08-rc1-bad",
+  "tables_stable": true,
+  "table_set": [
+    "ingestion_batches",
+    "ingestion_replay_logs",
+    "policy_config",
+    "quarantine_records",
+    "spec_check_tasks",
+    "specs",
+    "task_action_runs",
+    "task_runs"
+  ],
+  "phases": [
+    {
+      "phase": "R0-known-good-baseline",
+      "config": "sunroof-config-w08.json",
+      "db_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sunroof-drill-r0-hren5fnt\\sunroof_drill.db",
+      "base_url": "http://127.0.0.1:49848",
+      "converger_exit": 0,
+      "converged": true,
+      "smoke_exit": 0,
+      "smokes_passed": 4,
+      "smoke_all_passed": true,
+      "failed_smokes": [],
+      "expectation_met": true
+    },
+    {
+      "phase": "R1-bad-config-injected",
+      "config": "sunroof-config-w08-rc1-bad.json",
+      "db_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sunroof-drill-r1-yl_74bny\\sunroof_drill.db",
+      "base_url": "http://127.0.0.1:49859",
+      "converger_exit": 0,
+      "converged": true,
+      "smoke_exit": 1,
+      "smokes_passed": 3,
+      "smoke_all_passed": false,
+      "failed_smokes": [
+        "SMOKE-01"
+      ],
+      "expectation_met": true
+    },
+    {
+      "phase": "R2-convergent-rollback",
+      "config": "sunroof-config-w08.json",
+      "db_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sunroof-drill-r2-ffvsx6yr\\sunroof_drill.db",
+      "base_url": "http://127.0.0.1:49870",
+      "converger_exit": 0,
+      "converged": true,
+      "smoke_exit": 0,
+      "smokes_passed": 4,
+      "smoke_all_passed": true,
+      "failed_smokes": [],
+      "expectation_met": true
+    }
+  ],
+  "drill_passed": true
+}

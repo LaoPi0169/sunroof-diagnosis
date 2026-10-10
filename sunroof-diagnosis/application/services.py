@@ -20,10 +20,33 @@ from application.models import (
     StatusEnum,
     TrustedUser,
 )
-from application.database import query_current_specs, record_task_run
+from application.database import (
+    get_policy_config_value,
+    query_current_specs,
+    record_task_run,
+)
 
-# 偏差硬限 (引擎侧公开规则常量, 非受控文档内容): |偏差%| 超过该值需质量主管复核
+# 偏差硬限引擎默认值 (配置缺失/非法时的行为等价回退, 与 004 迁移种子一致):
+# |偏差%| 超过该值需质量主管复核。节点 05 起运行时真值来自 policy_config 表
+# (发布配置收敛器唯一可写面), known-good 配置 (15.0) 下行为与冻结基线逐字节等价。
 HARD_LIMIT_DEVIATION_PCT = 15.0
+HARD_LIMIT_CONFIG_KEY = "spec_check.hard_limit_deviation_pct"
+
+
+def get_hard_limit_deviation_pct() -> float:
+    """读取运行时偏差硬限: policy_config 配置优先; 缺失/非法/非正值回退引擎默认。
+
+    收敛器不判对错 (对错靠评审 + 冒烟双防线), 因此引擎对非法配置值自行防御:
+    解析失败或 <= 0 一律回退默认值, 绝不让坏配置拖垮服务可用性。
+    """
+    try:
+        raw = get_policy_config_value(HARD_LIMIT_CONFIG_KEY)
+        if raw is None:
+            return HARD_LIMIT_DEVIATION_PCT
+        value = float(raw)
+        return value if value > 0 else HARD_LIMIT_DEVIATION_PCT
+    except Exception:
+        return HARD_LIMIT_DEVIATION_PCT
 
 # 工序 -> 计量单位映射 (引擎侧常量, 供阻断预览描述实测值; 不泄露规格库内容)
 UNIT_BY_PROCESS = {
@@ -118,16 +141,17 @@ def process_spec_check(request: SpecCheckRequest, user: TrustedUser) -> SpecChec
 def _resolve_unique_match(request: SpecCheckRequest, user: TrustedUser, best: dict) -> SpecCheckResponse:
     """唯一现行有效规格命中: 先判硬限阻断, 再判 answered (带引用证据)。"""
     deviation_pct = compute_deviation_pct(request.measured_value, best["nominal_value"])
+    hard_limit = get_hard_limit_deviation_pct()
 
     # 2.3a 偏差超硬限 -> needs_review / SPEC_HARD_LIMIT_EXCEEDED
     #      响应不含任何规格内容 (spec/evaluation 恒为 None), 审计不留隐性依据
-    if abs(deviation_pct) > HARD_LIMIT_DEVIATION_PCT:
+    if abs(deviation_pct) > hard_limit:
         preview = ReviewPreview(
             target_role="quality_supervisor",
             suggested_action="创建质量主管复核单（原系统人工录入）",
             reason=(
                 f"实测值 {request.measured_value} {UNIT_BY_PROCESS[request.process_step.value]} "
-                f"相对现行规格偏差 {deviation_pct}%，超过 {HARD_LIMIT_DEVIATION_PCT}% 硬限，"
+                f"相对现行规格偏差 {deviation_pct}%，超过 {hard_limit}% 硬限，"
                 "需质量主管复核确认"
             ),
         )

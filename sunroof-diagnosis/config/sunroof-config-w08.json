@@ -1,0 +1,16 @@
+{
+  "config_version": "sunroof-config-w08-v1",
+  "release_id": "sunroof-app-w08-r0",
+  "description": "天窗总成只读诊断发布冻结配置 (known-good)。config_baseline 为部署后数据库必须收敛到的发布断言; config_overrides 为空表示不做任何增量变更。deploy/apply_policy_config.py 以幂等 UPSERT 收敛 policy_config 表到本基线: 不建表、不删库、不改动节点 02-04 冻结 DDL 与契约。spec_check.hard_limit_deviation_pct 与节点 02 引擎默认常量一致 (15.0), known-good 配置下引擎行为逐字节等价。",
+  "config_baseline": [
+    {
+      "config_key": "spec_check.hard_limit_deviation_pct",
+      "config_value": "15.0"
+    },
+    {
+      "config_key": "release.config_version",
+      "config_value": "sunroof-config-w08-v1"
+    }
+  ],
+  "config_overrides": []
+}
