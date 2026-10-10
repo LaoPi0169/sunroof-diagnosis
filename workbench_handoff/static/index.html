@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>值守交接 · 双角色工作台（第 18 周）</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#c0392b; --warn:#b7791f; --muted:#8a94a6;
+          --line:#dde3ec; --bg:#f5f7fb; --card:#ffffff; --ink:#1c2733; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:#12263f; color:#fff; padding:14px 22px; }
+  header h1 { font-size:18px; margin:0 0 6px; }
+  #run-bar { font-size:13px; color:#c9d6e8; margin-bottom:8px; }
+  .tabbar button { margin-right:8px; background:#1d3a5f; color:#c9d6e8;
+                   border:1px solid #4a6b99; border-radius:6px; padding:6px 18px; }
+  .tabbar button.active { background:#3b82c4; color:#fff; font-weight:bold; }
+  main { padding:16px 22px; max-width:1380px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:4px 0 10px; line-height:1.6; }
+  button { font-size:14px; padding:8px 16px; border-radius:8px; cursor:pointer;
+           border:1px solid var(--line); background:#eef2f8; }
+  button.primary { background:#1a5fb4; border-color:#1a5fb4; color:#fff; }
+  button.danger { background:#c0392b; border-color:#c0392b; color:#fff; }
+  button.warn { background:#b7791f; border-color:#b7791f; color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:10px; margin-bottom:8px; align-items:center; flex-wrap:wrap; }
+  code { background:#eef2f8; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .verdict { padding:9px 12px; border-radius:8px; font-size:13.5px; margin:8px 0; }
+  .verdict.ok   { background:#e8f5ec; color:var(--ok); border:1px solid #bfe3c9; }
+  .verdict.bad  { background:#fdecea; color:var(--bad); border:1px solid #f5c6c0; }
+  .verdict.warn { background:#fdf6e7; color:var(--warn); border:1px solid #f0dcae; }
+  .verdict.info { background:#eef2f8; color:#1c2733; border:1px solid var(--line); }
+  table.t { border-collapse:collapse; width:100%; font-size:12.5px; margin:6px 0; }
+  table.t th, table.t td { border:1px solid var(--line); padding:4px 8px;
+                           text-align:left; word-break:break-all; }
+  table.t th { background:#f2f6fc; }
+  pre { background:#12263f; color:#d7e4f5; padding:10px; border-radius:8px;
+        font-size:11.5px; overflow:auto; max-height:320px; }
+  .badge { display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:10px;
+           margin-left:6px; border:1px solid var(--line); background:#f2f6fc; }
+  .badge.bad { background:#fdecea; border-color:#f5c6c0; color:var(--bad); }
+  .badge.ok  { background:#e8f5ec; border-color:#bfe3c9; color:var(--ok); }
+  .badge.warn{ background:#fdf6e7; border-color:#f0dcae; color:var(--warn); }
+  input { padding:7px 10px; border:1px solid var(--line); border-radius:6px;
+          font-size:13px; }
+  input[type=password] { width:180px; }
+  .stat { display:inline-block; margin-right:14px; font-size:13.5px; }
+  .stat b { font-size:16px; }
+  ul.scope { font-size:13px; line-height:1.8; margin:4px 0 8px; }
+  .warnbox { background:#fdecea; border:1px solid #f5c6c0; color:var(--bad);
+             border-radius:8px; padding:8px 12px; font-size:13px; margin:8px 0; }
+  select { padding:6px 10px; border:1px solid var(--line); border-radius:6px;
+           font-size:13px; max-width:460px; }
+</style>
+</head>
+<body>
+<script>
+/* 兜底哨兵（ES5）: 主脚本若解析/执行失败, 顶部显示可见红条 —— 不让任何人面对沉默失灵的按钮 */
+window.__wbFatal = function (msg) {
+  var bar = document.getElementById('js-error-bar');
+  if (!bar && document.body) {
+    bar = document.createElement('div');
+    bar.id = 'js-error-bar';
+    bar.style.cssText = 'background:#fdecea;border-bottom:1px solid #f5c6c0;color:#c0392b;'
+      + 'padding:10px 16px;font:13px/1.6 "Microsoft YaHei",sans-serif;';
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+  if (bar) {
+    bar.style.display = 'block';
+    bar.textContent = '页面脚本异常: ' + msg + '　—— 请改用新版 Edge / Chrome 并按 Ctrl+F5 刷新; 仍失败请联系交付人。';
+  }
+};
+window.addEventListener('error', function (e) {
+  if (e && e.message) { window.__wbFatal(String(e.message)); }
+});
+</script>
+<header>
+  <h1>值守交接工作台 · 第 18 周（端口 8018）<span class="badge" style="background:#1d3a5f;color:#c9d6e8;">双角色 · 服务端强制权限</span></h1>
+  <div id="run-bar">交接演练主线: 交接材料 → 值守注入封存故障（F-18.1 / F-18.2）→ 任务面观察 → 按判断表选动作（开关 / 完整版本包回滚）→ 恢复「四+1 条任务路径」复验 → 记录归档</div>
+  <div class="tabbar">
+    <button id="btn-tab-user" class="active" onclick="showTab('user')">业务用户</button>
+    <button id="btn-tab-admin" onclick="showTab('admin')">管理员 / 值守</button>
+  </div>
+</header>
+<main>
+  <div id="tab-user">
+    <div class="card">
+      <h2>服务状态</h2>
+      <div id="user-status" class="verdict info">加载中…</div>
+      <div class="stat">累计外部效果（真实工单笔数）: <b id="u-effects">0</b></div>
+      <div class="stat">当前任务: <code id="u-run">—</code></div>
+    </div>
+    <div class="card">
+      <h2>我能做什么（业务用户权限范围 — 由服务端强制，不是页面装饰）</h2>
+      <div class="hint">越权的操作直接调不到（服务端返回 403）。配置类操作（注入故障 / 开关 / 回滚）只在「管理员 / 值守」标签页登录后可见可用。</div>
+      <div id="u-scope">加载中…</div>
+    </div>
+    <div class="card">
+      <h2>口径问答（点一个场景提问；答案会附「依据文档 + 版本」）</h2>
+      <div class="row">
+        <button onclick="ask('q-billing-east')">问: 华东套餐差价怎么计费?</button>
+        <button onclick="ask('q-out-of-scope')">问: 号码归属地转外省怎么办?</button>
+        <button onclick="ask('q-restricted')">问: 主管专属退款政策额度?</button>
+      </div>
+      <div id="qa-out" class="hint">点击上方按钮提问。</div>
+    </div>
+    <div class="card">
+      <h2>工单办理（生成主管复核单: 预览 → 受控确认 → 执行）</h2>
+      <div class="row">
+        <button id="u-btn-preview" class="primary" onclick="doPreview()">① 生成预览</button>
+        <button id="u-btn-approve" onclick="doDecide('approve')">② 批准</button>
+        <button id="u-btn-deny" onclick="doDecide('deny')">② 拒绝</button>
+        <button id="u-btn-execute" class="primary" onclick="doExecute()">③ 执行创建</button>
+      </div>
+      <div class="row">
+        <button id="u-btn-retry" class="warn" onclick="doRetry()">稍后重试（续跑同一任务）</button>
+        <button id="u-btn-replay" onclick="doReplay()">幂等重放（证明无重复效果）</button>
+      </div>
+      <div id="wr-out" class="hint">按 ①→②→③ 顺序操作。每一步会发生什么、产生了几个「外部效果」，都会如实显示。</div>
+    </div>
+    <div class="card">
+      <h2>我的任务（本会话）</h2>
+      <table class="t" id="u-tasks"><tr><th>任务</th><th>类型</th><th>结果</th><th>外部效果</th></tr></table>
+    </div>
+  </div>
+  <div id="tab-admin" style="display:none">
+    <div id="admin-login" class="card">
+      <h2>值守登录（管理员）</h2>
+      <div class="hint">所有配置类操作（封存故障注入 / 开关 / 版本包回滚 / 审计 / 重置）必须在登录后才可见可设置。
+        教学模拟口令见《白话文操作手册》第 3 节; 真实系统绝不这样存放口令。口令只用于比对, 不记录、不回显。</div>
+      <div class="row">
+        <label>值守代号: <input id="adm-operator" value="值守-甲"></label>
+        <label>口令: <input id="adm-passcode" type="password"></label>
+        <button class="primary" onclick="adminLogin()">登录</button>
+      </div>
+      <div id="adm-login-out" class="hint">未登录。</div>
+    </div>
+    <div id="admin-panels" style="display:none">
+      <div class="card">
+        <h2>现状总览 <span id="adm-who"></span></h2>
+        <div id="adm-overview" class="verdict info">…</div>
+        <div class="row">
+          <button onclick="refreshAdmin()">刷新</button>
+          <button onclick="adminLogout()">退出登录</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>封存故障包（F-18.1 / F-18.2 —— 只能由值守注入, 业务用户不可见）</h2>
+        <div class="warnbox">纪律: <b>关开关 ≠ 回滚</b>。外部依赖故障用开关/隔离修; 发布自身回归（配置坏了）只能回滚<b>完整版本包</b>。</div>
+        <div class="row">
+          <b>F-18.1 MCP 写通道不可达:</b>
+          <button class="warn" onclick="admFault('inject')">注入</button>
+          <button onclick="admFault('clear')">解除</button>
+        </div>
+        <div class="row">
+          <b>F-18.2 配置回归（废止政策被复活）:</b>
+          <button class="warn" onclick="admPackage('activate')">重埋回归（挂回 rc-18.1）</button>
+          <button class="danger" onclick="admPackage('rollback')">回滚完整版本包 → rc-18.0</button>
+        </div>
+        <div class="row">
+          <b>MCP_OFF 开关:</b>
+          <button class="warn" onclick="admSwitch('set')">打开开关（隔离写通道）</button>
+          <button onclick="admSwitch('clear')">复位开关</button>
+          <label>理由（必填）: <input id="adm-reason" size="42" placeholder="如: 观察到写通道 5 分钟全失败, 按手册切隔离"></label>
+        </div>
+        <div class="hint">开关与回滚动作都会带「操作者 + 理由 + 时间」进追加式审计; 无理由的版本包动作会被服务端直接拒绝。</div>
+      </div>
+      <div class="card">
+        <h2>审计（追加式, 只增不改）</h2>
+        <div class="hint">开关审计</div>
+        <table class="t" id="adm-switch-audit"></table>
+        <div class="hint">版本包与故障注入审计（含登录审计见下)</div>
+        <table class="t" id="adm-pkg-audit"></table>
+        <table class="t" id="adm-fault-audit"></table>
+        <div class="hint">登录审计（只有代号与结果, 永无口令）</div>
+        <table class="t" id="adm-login-audit"></table>
+      </div>
+      <div class="card">
+        <h2>发布清单 v2 · 六类绑定（回滚目标必须「整包对齐」）</h2>
+        <div id="adm-manifest" class="hint">…</div>
+      </div>
+      <div class="card">
+        <h2>恢复复验 ·「四+1 条任务路径」跑批（只看健康接口不算恢复）</h2>
+        <div class="row">
+          <button class="primary" onclick="runRecovery()">运行四+1 复验</button>
+          <span class="hint">正常查询 / 正确拒答 / 人工升级 / 逐次批准写入 / 重复请求与效果对账</span>
+        </div>
+        <table class="t" id="adm-recovery"></table>
+      </div>
+      <div class="card">
+        <h2>任务追踪（九阶段链; 含降级段与引用版本段）</h2>
+        <div class="row">
+          <select id="adm-task-sel"></select>
+          <button onclick="showTrace()">查看链路</button>
+        </div>
+        <pre id="adm-trace">选择任务后点「查看链路」。</pre>
+      </div>
+      <div class="card">
+        <h2>危险区</h2>
+        <div class="row">
+          <button class="danger" onclick="admReset()">重置环境（全部任务/审计/会话归零, 需重新登录）</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</main>
+<script>
+/* ===== Week 18 值守交接工作台 前端 (ES5; 双角色; token 仅存内存, 不落任何存储) ===== */
+var TOKEN = '';
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function api(method, url, body, cb) {
+  var xhr = new XMLHttpRequest();
+  xhr.open(method, url, true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  if (TOKEN) { xhr.setRequestHeader('X-Session-Token', TOKEN); }
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) { return; }
+    var data = null;
+    try { data = JSON.parse(xhr.responseText); } catch (e) { data = null; }
+    cb(xhr.status, data);
+  };
+  xhr.send(body ? JSON.stringify(body) : null);
+}
+
+function verdict(msg, cls) {
+  return '<div class="verdict ' + cls + '">' + msg + '</div>';
+}
+
+function showTab(which) {
+  $('tab-user').style.display = (which === 'user') ? '' : 'none';
+  $('tab-admin').style.display = (which === 'admin') ? '' : 'none';
+  $('btn-tab-user').className = (which === 'user') ? 'active' : '';
+  $('btn-tab-admin').className = (which === 'admin') ? 'active' : '';
+  if (which === 'user') { refreshUser(); }
+}
+
+/* ---------- 业务用户 ---------- */
+function renderUser(st) {
+  var v = $('user-status');
+  v.className = 'verdict ' + (st.degraded_now ? 'warn' : 'ok');
+  v.textContent = st.friendly_status;
+  $('u-effects').textContent = st.effects_total;
+  $('u-run').textContent = st.run_id || '—';
+  var sc = st.service_scope || {};
+  var html = '<ul class="scope">';
+  var i;
+  for (i = 0; i < (sc.allowed || []).length; i++) { html += '<li>✅ ' + esc(sc.allowed[i]) + '</li>'; }
+  for (i = 0; i < (sc.conditional || []).length; i++) { html += '<li>⚠️ ' + esc(sc.conditional[i]) + '</li>'; }
+  for (i = 0; i < (sc.forbidden || []).length; i++) { html += '<li>⛔ ' + esc(sc.forbidden[i]) + '</li>'; }
+  html += '</ul>';
+  $('u-scope').innerHTML = html;
+  $('u-btn-preview').disabled = !!st.degraded_task;
+  $('u-btn-approve').disabled = !st.preview || !!st.decision_effective;
+  $('u-btn-deny').disabled = !st.preview || !!st.decision_effective;
+  $('u-btn-execute').disabled = !st.preview || st.decision_effective !== 'approved';
+  $('u-btn-retry').disabled = !st.degraded_task;
+  $('u-btn-replay').disabled = !st.run_id;
+  var rows = '<tr><th>任务</th><th>类型</th><th>结果</th><th>外部效果</th></tr>';
+  var tasks = st.tasks || [];
+  for (i = 0; i < tasks.length; i++) {
+    rows += '<tr><td>' + esc(tasks[i].task_run_id) + '</td><td>' + esc(tasks[i].kind) +
+      '</td><td>' + esc(tasks[i].outcome) + '</td><td>' + esc(tasks[i].external_effects) + '</td></tr>';
+  }
+  $('u-tasks').innerHTML = rows;
+}
+
+function refreshUser() {
+  api('GET', '/api/user/state', null, function (code, data) {
+    if (code === 200 && data) { renderUser(data); }
+  });
+}
+
+function ask(qid) {
+  api('POST', '/api/user/ask', { question_id: qid }, function (code, data) {
+    var box = $('qa-out');
+    if (code !== 200 || !data) {
+      box.innerHTML = verdict('问答失败 (HTTP ' + code + ')', 'bad');
+      return;
+    }
+    var cls = (data.status === 'answered') ? (data.citation && data.citation.current ? 'ok' : 'warn')
+      : (data.status === 'abstained' ? 'info' : 'warn');
+    var html = verdict(esc(data.message) +
+      (data.citation ? '<br>依据: <code>' + esc(data.citation.document_id) + '</code> · ' +
+        esc(data.citation.version_label) + (data.citation.current ? '' : ' <b>← 已废止版本, 疑似配置回归</b>') : ''), cls);
+    html += '<div class="hint">任务链路: <code>' + esc(data.task_run_id) + '</code> (管理员侧可查九阶段链)</div>';
+    box.innerHTML = html;
+    renderUser(data.state);
+  });
+}
+function wrVerdict(envelope) {
+  if (!envelope) { return ''; }
+  if (envelope.status === 'action_completed') {
+    return verdict('✅ 已完成 (' + esc(envelope.status) + ')' +
+      (envelope.idempotency_key ? ' · 幂等键 <code>' + esc(envelope.idempotency_key) + '</code>' : ''), 'ok');
+  }
+  if (envelope.status === 'action_preview' && envelope.degraded) {
+    return verdict('⚠️ 依赖故障: 任务停在待办预览 (reason_code=' + esc(envelope.reason_code) +
+      ')。<b>没有产生任何外部效果</b>; 审批未消耗。可稍后点「稍后重试」续跑同一任务, 或走人工渠道。', 'warn');
+  }
+  if (envelope.status === 'action_preview') {
+    return verdict('预览已生成 (无副作用)。请核对后做「批准 / 拒绝」。', 'info');
+  }
+  if (envelope.status === 'error') {
+    return verdict('❌ ' + esc(envelope.error && envelope.error.message ? envelope.error.message : envelope.status) +
+      ' (code=' + esc(envelope.error && envelope.error.code) + ')', 'bad');
+  }
+  return verdict(esc(envelope.status), 'info');
+}
+
+function doPreview() {
+  api('POST', '/api/user/preview', null, function (code, data) {
+    if (code === 409) {
+      $('wr-out').innerHTML = verdict('有一个任务还停在待办预览: 请先「稍后重试」或联系值守。', 'warn');
+      return;
+    }
+    if (code !== 200 || !data) {
+      $('wr-out').innerHTML = verdict('预览失败 (HTTP ' + code + ')', 'bad');
+      return;
+    }
+    $('wr-out').innerHTML = wrVerdict(data.envelope);
+    renderUser(data.state);
+  });
+}
+
+function doDecide(decision) {
+  api('POST', '/api/user/decide', { decision: decision }, function (code, data) {
+    if (code !== 200 || !data) {
+      $('wr-out').innerHTML = verdict('确认失败 (HTTP ' + code + ')', 'bad');
+      return;
+    }
+    $('wr-out').innerHTML = verdict(decision === 'approve'
+      ? '已批准 (受控确认)。下一步点「③ 执行创建」。'
+      : '已拒绝 (正常终态, 不产生任何效果)。', decision === 'approve' ? 'ok' : 'info');
+    renderUser(data.state);
+  });
+}
+
+function doExecute() {
+  api('POST', '/api/user/execute', null, function (code, data) {
+    if (code === 400) {
+      $('wr-out').innerHTML = verdict('还不能执行: ' + esc(data && data.detail || '需要先预览并批准'), 'warn');
+      return;
+    }
+    if (code !== 200 || !data) {
+      $('wr-out').innerHTML = verdict('执行失败 (HTTP ' + code + ')', 'bad');
+      return;
+    }
+    $('wr-out').innerHTML = wrVerdict(data.envelope);
+    renderUser(data.state);
+  });
+}
+
+function doRetry() {
+  api('POST', '/api/user/retry', null, function (code, data) {
+    if (code !== 200 || !data) {
+      $('wr-out').innerHTML = verdict('续跑失败 (HTTP ' + code + ')' +
+        (data && data.detail ? ': ' + esc(data.detail) : ''), 'warn');
+      refreshUser();
+      return;
+    }
+    $('wr-out').innerHTML = wrVerdict(data.envelope);
+    renderUser(data.state);
+  });
+}
+
+function doReplay() {
+  api('POST', '/api/user/replay', null, function (code, data) {
+    if (code !== 200 || !data) {
+      $('wr-out').innerHTML = verdict('重放失败 (HTTP ' + code + ')' +
+        (data && data.detail ? ': ' + esc(data.detail) : ''), 'bad');
+      return;
+    }
+    $('wr-out').innerHTML = wrVerdict(data.envelope) +
+      verdict(data.effect_count_unchanged
+        ? '✅ 对账通过: 重放后工单计数不变 (' + data.ticket_total + ') — 没有重复效果。'
+        : '❌ 对账异常: 计数变了 — 请立即联系值守!', data.effect_count_unchanged ? 'ok' : 'bad');
+    renderUser(data.state);
+  });
+}
+/* ---------- 管理员 / 值守 ---------- */
+function adminLogin() {
+  var operator = $('adm-operator').value || '';
+  var passcode = $('adm-passcode').value || '';
+  api('POST', '/api/admin/login', { operator: operator, passcode: passcode }, function (code, data) {
+    if (code !== 200 || !data) {
+      $('adm-login-out').innerHTML = verdict('登录失败: ' + esc(data && data.detail || 'HTTP ' + code), 'bad');
+      return;
+    }
+    TOKEN = data.token;
+    $('adm-passcode').value = '';
+    $('admin-login').style.display = 'none';
+    $('admin-panels').style.display = '';
+    $('adm-login-out').innerHTML = verdict('已登录: ' + esc(data.operator), 'ok');
+    renderAdmin(data.state);
+  });
+}
+
+function adminLogout() {
+  api('POST', '/api/admin/logout', null, function () {
+    TOKEN = '';
+    $('admin-panels').style.display = 'none';
+    $('admin-login').style.display = '';
+    $('adm-login-out').innerHTML = verdict('已退出登录。', 'info');
+  });
+}
+
+function refreshAdmin() {
+  api('GET', '/api/admin/state', null, function (code, data) {
+    if (code === 403) {
+      TOKEN = '';
+      $('admin-panels').style.display = 'none';
+      $('admin-login').style.display = '';
+      $('adm-login-out').innerHTML = verdict('会话已失效, 请重新登录。', 'warn');
+      return;
+    }
+    if (code === 200 && data) { renderAdmin(data); }
+  });
+}
+
+function renderAdmin(st) {
+  $('adm-who').textContent = '· 值守: ' + (st.operator || '');
+  var d = st.degraded || {};
+  var pkg = st.qa_binding || {};
+  var cls = d.degraded_now ? 'bad' : 'ok';
+  var html = '依赖状态: ' + (d.degraded_now
+    ? ('<b>降级中</b> (来源: ' + esc(d.source) + ') — 写任务会停在待办预览, 读/预览不受阻')
+    : '<b>正常</b>');
+  html += '<br>现行版本包: <code>' + esc(pkg.active_package) + '</code> · 现行口径绑定: <code>' +
+    esc(pkg.policy_active_binding) + '</code> (' + esc(pkg.policy_active_version) + ')' +
+    (pkg.known_good ? ' <span class="badge ok">已知良好</span>' : ' <span class="badge bad">配置回归 (F-18.2)</span>');
+  html += '<br>活动会话数: ' + st.session_count + ' · 累计外部效果: ' + st.effects_total +
+    ' · 工单总数(当前任务世界): ' + st.ticket_total;
+  if (st.degraded_task) {
+    html += '<br>⚠️ 有任务停在待办预览: <code>' + esc(st.degraded_task.run_id) + '</code> (恢复后可由业务用户「稍后重试」续跑)';
+  }
+  $('adm-overview').innerHTML = html;
+  $('adm-overview').className = 'verdict ' + (d.degraded_now ? 'warn' : (pkg.known_good ? 'ok' : 'warn'));
+  renderAudit($('adm-switch-audit'), ['时间', '事件', '开关', '操作者', '理由'],
+    (st.switch_audit || []).map(function (e) {
+      return [e.at, e.event, e.switch, e.operator, e.reason || ''];
+    }));
+  renderAudit($('adm-pkg-audit'), ['时间', '事件', '动作', '操作者', '理由'],
+    (st.package_audit || []).map(function (e) {
+      return [e.at, e.event, (e.from ? e.from + ' → ' + e.to : e.package || ''), e.operator, e.reason || ''];
+    }));
+  renderAudit($('adm-fault-audit'), ['时间', '事件', '故障', '操作者'],
+    (st.fault_audit || []).map(function (e) {
+      return [e.at, e.event, e.fault_id, e.operator];
+    }));
+  renderAudit($('adm-login-audit'), ['时间', '事件', '代号'],
+    (st.login_audit || []).map(function (e) {
+      return [e.at, e.event, e.operator];
+    }));
+  var m = st.release_manifest || {};
+  var mh = '<table class="t"><tr><th>绑定类</th><th>内容</th></tr>';
+  var bindings = m.bindings || {};
+  var keys = ['code', 'schema', 'corpus_index', 'prompts_generation', 'policy_tool_schema', 'env_config'];
+  for (var k = 0; k < keys.length; k++) {
+    var b = bindings[keys[k]];
+    if (!b) { continue; }
+    mh += '<tr><td>' + esc(b.category || keys[k]) + '</td><td>' + esc(b.artifact || '') +
+      (b.sha256 ? ' · sha256 <code>' + esc(String(b.sha256).substring(0, 16)) + '…</code>' : '') +
+      (b.git_ref ? ' · ref <code>' + esc(b.git_ref) + '</code>' : '') + '</td></tr>';
+  }
+  mh += '</table>';
+  if (m.release_id) { mh = '<div class="hint">release_id: <code>' + esc(m.release_id) + '</code></div>' + mh; }
+  $('adm-manifest').innerHTML = mh;
+  renderRecovery(st.recovery);
+  var sel = $('adm-task-sel');
+  var opts = '';
+  var tasks = st.tasks || [];
+  for (var i = 0; i < tasks.length; i++) {
+    opts += '<option value="' + esc(tasks[i].task_run_id) + '">' +
+      esc(tasks[i].task_run_id) + ' · ' + esc(tasks[i].kind) + ' · ' + esc(tasks[i].outcome) + '</option>';
+  }
+  sel.innerHTML = opts;
+}
+function renderAudit(table, headers, rows) {
+  var html = '<tr>';
+  for (var i = 0; i < headers.length; i++) { html += '<th>' + esc(headers[i]) + '</th>'; }
+  html += '</tr>';
+  if (!rows.length) {
+    html += '<tr><td colspan="' + headers.length + '">（暂无记录）</td></tr>';
+  }
+  for (var r = 0; r < rows.length; r++) {
+    html += '<tr>';
+    for (var c = 0; c < rows[r].length; c++) { html += '<td>' + esc(rows[r][c]) + '</td>'; }
+    html += '</tr>';
+  }
+  table.innerHTML = html;
+}
+
+function renderRecovery(rec) {
+  var el = $('adm-recovery');
+  if (!rec) {
+    el.innerHTML = '<tr><td>尚未运行。注意: 恢复 = 重跑四+1 条任务路径, 只看健康接口不算恢复。</td></tr>';
+    return;
+  }
+  var html = '<tr><th>路径</th><th>预期</th><th>实测</th><th>判定</th></tr>';
+  for (var i = 0; i < (rec.rows || []).length; i++) {
+    var row = rec.rows[i];
+    html += '<tr><td>' + esc(row.path) + '</td><td>' + esc(row.expected) + '</td><td>' +
+      esc(row.observed) + '</td><td>' + (row.pass ? '<span class="badge ok">pass</span>' :
+        '<span class="badge bad">fail</span>') + '</td></tr>';
+  }
+  html += '<tr><td colspan="3"><b>整体: ' + esc(rec.overall) + '</b> · 现行包 ' + esc(rec.active_package) +
+    ' · 运行于 ' + esc(rec.at) + '</td><td>' + (rec.overall === 'pass' ?
+      '<span class="badge ok">恢复确认</span>' : '<span class="badge bad">未恢复</span>') + '</td></tr>';
+  el.innerHTML = html;
+}
+
+function needReason(actionLabel) {
+  var reason = $('adm-reason').value || '';
+  if (!reason) {
+    $('adm-overview').innerHTML = verdict(actionLabel + ' 被拒绝: 请先在「理由」框填写处置理由 (无因操作未批准)。', 'bad');
+    return null;
+  }
+  return reason;
+}
+
+function admFault(action) {
+  api('POST', '/api/admin/fault', { action: action }, function (code, data) {
+    if (code !== 200 || !data) { return; }
+    renderAdmin(data.state);
+  });
+}
+
+function admSwitch(action) {
+  var reason = needReason('开关动作');
+  if (reason === null) { return; }
+  api('POST', '/api/admin/switch', { action: action, reason: reason }, function (code, data) {
+    if (code !== 200 || !data) { return; }
+    renderAdmin(data.state);
+  });
+}
+
+function admPackage(action) {
+  var reason = needReason(action === 'rollback' ? '版本包回滚' : '重埋回归');
+  if (reason === null) { return; }
+  api('POST', '/api/admin/package', { action: action, reason: reason }, function (code, data) {
+    if (code === 400) {
+      $('adm-overview').innerHTML = verdict('动作被拒绝: ' + esc(data && data.detail || ''), 'bad');
+      return;
+    }
+    if (code !== 200 || !data) { return; }
+    renderAdmin(data.state);
+  });
+}
+
+function runRecovery() {
+  api('POST', '/api/admin/recovery-check', null, function (code, data) {
+    if (code !== 200 || !data) { return; }
+    renderAdmin(data.state);
+  });
+}
+
+function showTrace() {
+  var id = $('adm-task-sel').value || '';
+  if (!id) { return; }
+  api('GET', '/api/admin/trace/' + encodeURIComponent(id), null, function (code, data) {
+    if (code !== 200 || !data) {
+      $('adm-trace').textContent = '查不到该任务 (HTTP ' + code + ')';
+      return;
+    }
+    var lines = [];
+    for (var i = 0; i < (data.spans || []).length; i++) {
+      var sp = data.spans[i];
+      lines.push((i + 1) + '. ' + sp.stage + ' → ' + sp.result +
+        (sp.error_class ? ' [err=' + sp.error_class + ']' : '') +
+        (sp.versions ? ' ' + JSON.stringify(sp.versions) : '') +
+        (sp.safe_refs ? ' ' + JSON.stringify(sp.safe_refs) : ''));
+    }
+    lines.push('终态: ' + data.task.outcome + ' · 外部效果: ' + data.task.external_effects);
+    $('adm-trace').textContent = lines.join('\n');
+    refreshAdmin();
+  });
+}
+
+function admReset() {
+  api('POST', '/api/admin/reset', null, function (code, data) {
+    TOKEN = '';
+    $('admin-panels').style.display = 'none';
+    $('admin-login').style.display = '';
+    $('adm-login-out').innerHTML = verdict('环境已重置 (回到交接初始态 rc-18.1); 请重新登录。', 'warn');
+    refreshUser();
+  });
+}
+
+/* 初始: 默认业务用户视图 */
+showTab('user');
+refreshUser();
+</script>
+</body>
+</html>

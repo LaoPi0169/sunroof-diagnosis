@@ -873,6 +873,61 @@ forbidden_effect_count 0、效果合计恰 3、73 段 span 脱敏 0 违规。全
 而非 partial 终端复刻；开关批准=操作人+理由留痕，真实系统需双人在岗与
 冷静期；不提前做第 18 周冷交接。
 
+## 第 18 周：值守冷交接（交接包 × 封存故障 × 完整版本包回滚 × 双角色工作台）
+
+把第 15-17 周机制当作**已建成的存量**（手册 4015：不重新发明告警/降级/回滚），
+补齐「非作者也能安全接管」的最后一层：发布材料体检（第 8 周 v1 清单对照六类
+绑定出缺口）、完整发布清单 v2（sha256/git ref，不含秘密）、任务式运维交接包、
+封存故障包（F-18.1 MCP 不可达 / F-18.2 配置回归）、值守交接工作台 8018
+（**双角色隔离**：业务用户免登录只见权限内操作，注入/开关/回滚/审计/清单全部
+要求管理员登录，服务端 403 强制）、冷交接演练记录（B 路代理冷启动 +
+`simulated_self_replay` 诚实标注）、runbook 修订日志、业务/一线回读、阶段门
+出口评审。核心纪律：**关开关 ≠ 回滚**——外部依赖故障用开关/隔离，发布自身
+回归只能回滚**完整版本包**（六类绑定）；恢复 = 重跑「四+1 条任务路径」，只看
+健康接口不算。非作者真实复验按 A 路待约（`handoff_gate: pending`）。
+
+```
+week-18/release-package-annotations-v1.md       # Day-1 发布材料体检（v1 清单逐项对照六类绑定 + 缺口清单）
+week-18/full-release-manifest-v2.json           # 完整发布清单 v2（六类绑定 sha256/ref + rc-18.0/rc-18.1 版本包）
+week-18/ops-handoff-pack-v1.md                  # 任务式运维交接包（范围/症状表/开关与回滚四件套/恢复四+1）
+week-18/sealed-fault-pack-v1.md                 # 封存故障包（F-18.1/F-18.2 剧本 + 判定表 + NO-GO 红线）
+week-18/handoff-workbench-plain-guide-v1.md     # 白话文操作手册（业务用户/管理员两册 + 值守口令说明）
+week-18/cold-handoff-record-v1.md               # 冷交接记录（代理冷启动 B 路，观察→归因→动作→复验判断表）
+week-18/runbook-revision-log-v1.md              # runbook 修订日志（调包期发现的摩擦点与改法）
+week-18/business-frontline-readback-v1.md       # 业务/一线回读（三视角，课程模拟并如实标注）
+week-18/stage-exit-w18-v1.md                    # 阶段门出口评审（证实/未证实/Capstone 重做项/NO-GO 复查）
+workbench_handoff/app.py                        # 值守交接工作台薄壳（8018；角色隔离 + 封存故障 + 回滚 + 四+1 复验）
+workbench_handoff/static/index.html             # 双角色前台（业务用户默认视图 / 管理员登录后配置面板, ES5）
+start_workbench_handoff.bat                     # 交付人双击启动（端口 8018, 自动打开浏览器）
+ci/redaction_scan.py                            # SCOPE_FILES 48 -> 50（交接工作台 2 文件入列）
+tests/test_handoff_week18.py                    # 23 个交接用例（全量 122 -> 145）
+```
+
+### 第 18 周验证方式
+
+```powershell
+# 值守交接工作台（业务用户开箱即用; 管理员需登录）
+start_workbench_handoff.bat           # 双击启动, 打开 http://127.0.0.1:8018
+
+# 交接与角色隔离测试（403 强制 / 口令零泄漏 / 两案例落点 / 回滚 / 四+1 复验 / 清单绑定）
+python -m unittest tests.test_handoff_week18 -v
+```
+
+### 第 18 周结果要点与边界（诚实不夸大）
+
+代理冷启动演练三轮全按剧本落点：F-18.1 注入 → 写停 action_preview（0 效果、
+审批不消耗）+ 读不受阻，解除后同一任务续跑恰 1 效果 + 幂等重放无重复；
+MCP_OFF 开关路落同一终态（审计含操作者+理由）；F-18.2 症状 = 正常问答引用
+废止口径版本（rc-18.1）→ 回滚完整版本包 rc-18.0 → 引用恢复现行版本，四+1
+复验 fail（回滚前）→ pass 5/5（回滚后）；遥测脱敏 16 事件 0 违规；值守口令
+在全部状态/审计/响应零出现（动态断言）。全量测试 122 → 145 全绿；
+SCOPE_FILES 48 → 50 零违规。**边界**：版本包/问答是进程内教学模拟（真实系统
+= 制品库+部署系统+真实语料服务）；代理冷启动证据如实标注
+`handoff_evidence: simulated_self_replay`、`handoff_gate: pending`（手册
+5902-5904），真实非作者按 A 路复验后才可收口；业务/一线回读为课程角色模拟；
+第 23-24 周 Capstone 仍需重做，本周成果不迁移。
+
+
 
 
 

@@ -1,0 +1,78 @@
+{
+  "manifest_version": 2,
+  "release_id": "northstar-app-w18-handoff-v2",
+  "supersedes": "release-manifest-v1.json (northstar-app-w08-r0)",
+  "authored_at": "2026-10-10",
+  "purpose": "第 18 周冷交接的「完整版本包」清单 —— 手册 4079-4086 六类绑定: 代码 / schema / 语料索引 / 提示 / 策略工具 / 环境配置; 回滚必须整包对齐, 不是只回滚代码",
+  "code_revision": "d99ae4549c35db395439be29bbd59da88694476e",
+  "code_revision_note": "main 合并提交 (week17-degradation --no-ff 合入); 冻结应用代码基线仍为 tag week07-baseline (0b3d8aed734ac4d250e78e493aeede615c9c4424)",
+  "bindings": {
+    "code": {
+      "category": "① 代码",
+      "artifact": "application/ + migrations/ 冻结应用代码 (tag week07-baseline) + mcptool/ 工具链与三个工作台",
+      "git_ref": "d99ae4549c35db395439be29bbd59da88694476e",
+      "frozen_tag": "week07-baseline"
+    },
+    "schema": {
+      "category": "② schema",
+      "artifact": "migrations/001_init_schema.sql + 002_ingestion_schema.sql + 003_tasks_and_permissions_schema.sql",
+      "schema_version": "003",
+      "rule": "schema_version 在回滚中保持 003 不变 (不删库/不改 DDL)"
+    },
+    "corpus_index": {
+      "category": "③ 语料索引",
+      "artifact": "corpus-manifest-v1.json (18 chunks 快照 northstar-corpus-w09-v1) + week-11/retrieval-comparison-manifest-v1.json",
+      "sha256": "41d127ed0785df040afd0ba801a7bc5c08f88cd4c6baedad2cd526bf4a67cda1",
+      "note": "引用必须回到冻结语料清单; 废止/冲突文档不得进入现行候选集"
+    },
+    "prompts_generation": {
+      "category": "④ 提示与生成/引用合同",
+      "artifact": "week-12/rag-system-manifest-v1.json (三态回答合同 + 引用支持验证 + 词表互锁)",
+      "sha256": "5087620d48d1b9f314acf2aebe5238f0be4ae8e8ad51b959fe8ee70b026ce4e4"
+    },
+    "policy_tool_schema": {
+      "category": "⑤ 策略/审批/工具 schema",
+      "artifact": "week-15/mcp-capability-manifest-v2.json (工具目录冻结) + mcptool/write_contract.py (写合同) + policy ticket-create-policy-v1",
+      "sha256_capability_manifest": "136efe013cd5919d4f51af5df5bcf3770be4b33218d7b7a49731eabcb3a8a918",
+      "sha256_write_contract": "a3fc26d76275418de6c9792622c4ee02fbb5d25244d053fa7c0a8bb05ba1c775"
+    },
+    "env_config": {
+      "category": "⑥ 环境配置与夹具",
+      "artifact": "config/policy-config.json (known-good 断言) + fixtures-w07-r1 + 现行口径绑定映射",
+      "sha256": "625f1159104457abf77e656be20cce387887cbccc0736c07e65a57ec19ecb7d1",
+      "policy_active_mapping_known_good": "billing-general-v3 (v3, 2026-01-01 起现行)"
+    }
+  },
+  "policy_active_mapping": {
+    "known_good": "billing-general-v3",
+    "known_forbidden_as_current": "billing-general-v1 (2025 版, 已废止; 出现在现行绑定 = 配置回归)"
+  },
+  "packages": {
+    "rc-18.0": {
+      "role": "rollback_target",
+      "known_good": true,
+      "policy_active_binding": "billing-general-v3",
+      "bindings_digest_note": "六类绑定与本文件完全一致"
+    },
+    "rc-18.1": {
+      "role": "current_at_handoff",
+      "known_good": false,
+      "policy_active_binding": "billing-general-v1",
+      "regression": "F-18.2: 配置回归 —— 废止版本被复活进现行口径绑定 (仅 env_config/policy_active_mapping 一类漂移; 其余五类与 rc-18.0 相同)"
+    }
+  },
+  "rollback": {
+    "strategy": "full-package-switch (教学模拟: 值守在工作台 8018 一键回滚到 rc-18.0; 真实系统 = 制品库回切 + 部署系统)",
+    "requires": ["管理员登录", "理由 (审计留痕)"],
+    "not_rollbacks": [
+      "外部依赖故障 (MCP 不可达) —— 用 MCP_OFF 开关/隔离, 回滚修不了外部依赖 (手册 4034)",
+      "业务数据/审计记录 —— 只增不改, 回滚不清理"
+    ],
+    "verification": "重跑「四+1 条任务路径」: 正常查询(引用现行版本) / 正确拒答 / 人工升级 / 逐次批准写入(+1 效果) / 重复请求与效果对账(计数不变)"
+  },
+  "non_goals": [
+    "不含任何秘密/凭据 (口令、token、密钥零出现)",
+    "不替代第 23-24 周 Capstone 的重做",
+    "不引入任何模型调用不确定性 (全链路确定性模拟)"
+  ]
+}

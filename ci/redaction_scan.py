@@ -24,7 +24,9 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 扫描范围 (运行时代码, 不含 tests/ 与 docs); Week 17: 44 -> 48
-# (kill_switch / run_degradation_drill + 降级工作台 2 文件)
+# (kill_switch / run_degradation_drill + 降级工作台 2 文件); Week 18: 48 -> 50
+# (+ 值守交接工作台 2 文件 —— 登录口令字面量不属既有凭据清单, 但口令/审计/遥测
+#   零交叉由 test_handoff_week18 动态断言复验)
 SCOPE_FILES = [
     os.path.join("application", "auth.py"),
     os.path.join("application", "database.py"),
@@ -74,6 +76,8 @@ SCOPE_FILES = [
     os.path.join("mcptool", "run_degradation_drill.py"),
     os.path.join("workbench_degradation", "__init__.py"),
     os.path.join("workbench_degradation", "app.py"),
+    os.path.join("workbench_handoff", "__init__.py"),
+    os.path.join("workbench_handoff", "app.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)
