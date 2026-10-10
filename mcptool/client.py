@@ -23,6 +23,10 @@ Host 职责 (回链 week-13/trust-boundary-v1.md 六分区 + week-14 审批硬�
       开关激活时, ticket.create 停在 action_preview (degraded=true,
       reason_code=mcp_unavailable, 外部效果恒 0, 审批不消耗, 不自动重试);
       判定优先级: 权限拒绝/确定性错误照常走服务端, 不被降级吞掉。
+    8) Week 18: 值守冷交接复用层 —— 8018 工作台 (workbench_handoff/) 在本编排
+       之上做双角色隔离: 业务用户只见权限内任务操作, 注入/开关/版本包回滚/
+       审计/恢复复验要求管理员登录 (服务端 403 强制); 本文件零改动即可支撑
+       冷交接演练 (交接只加壳, 不改写通道语义)。
 外部效果只可能来自带有效审批的 ticket.create (唯一写入口); 其余路径恒 0。
 """
 from __future__ import annotations
