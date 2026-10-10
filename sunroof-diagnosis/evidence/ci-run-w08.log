@@ -1,0 +1,21 @@
+CI RUN 2026-10-10T13:07:31+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 35 tests in 5.837s, exit=0
+Ran 35 tests in 5.837s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=11; emissions_checked=39; violations=0
+[FAIL] STAGE-4-clean-env-smoke :: git archive failed: fatal: pathspec 'sunroof-diagnosis' did not match any files
+
+CI RESULT FAILED | duration=6.6s | 2026-10-10T13:07:37+00:00 (UTC)
+
+CI RUN 2026-10-10T13:20:49+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 35 tests in 5.988s, exit=0
+Ran 35 tests in 5.988s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=11; emissions_checked=39; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-rjj9ki0a; port=49630; smokes_passed=4/4
+CI RESULT OK | duration=8.5s | 2026-10-10T13:20:57+00:00 (UTC)
+

@@ -22,11 +22,13 @@ _DEFAULT_DB_PATH = os.path.join(
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "migrations")
 # 迁移脚本按序执行 (001 = 节点 02 基线 DDL + Fixtures; 002 = 节点 03 摄取/隔离/重放表;
-#                    003 = 节点 04 任务表 + 任务动作审计表 + 任务夹具)
+#                    003 = 节点 04 任务表 + 任务动作审计表 + 任务夹具;
+#                    004 = 节点 05 发布配置表 policy_config + 种子默认值)
 MIGRATION_SCRIPTS = [
     "001_init_schema.sql",
     "002_ingestion_schema.sql",
     "003_tasks_and_permissions_schema.sql",
+    "004_deployment_schema.sql",
 ]
 
 # 节点 03 血缘列: 通过幂等 ALTER 追加到 001 已冻结的 specs 表，
@@ -278,6 +280,35 @@ def get_task_action_runs_by_correlation(correlation_id: str) -> List[Dict[str, A
             "SELECT * FROM task_action_runs WHERE correlation_id = ? ORDER BY rowid ASC",
             (correlation_id,),
         )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# 节点 05: 发布配置数据访问 (policy_config —— 收敛器唯一可写面, 引擎只读)
+# ============================================================================
+
+def get_policy_config_value(config_key: str) -> Optional[str]:
+    """按配置键读取发布配置值 (引擎侧阈值来源; 缺失时返回 None 由调用方回退默认)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT config_value FROM policy_config WHERE config_key = ?", (config_key,)
+        )
+        row = cursor.fetchone()
+        return row["config_value"] if row else None
+    finally:
+        conn.close()
+
+
+def list_policy_config() -> List[Dict[str, Any]]:
+    """列出全部发布配置 (回滚演练/对账核验用: 收敛前后投影一致 = 幂等)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM policy_config ORDER BY config_key ASC")
         return [dict(row) for row in cursor.fetchall()]
     finally:
         conn.close()

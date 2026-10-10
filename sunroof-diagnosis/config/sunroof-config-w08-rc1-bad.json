@@ -1,0 +1,25 @@
+{
+  "config_version": "sunroof-config-w08-rc1-bad",
+  "release_id": "sunroof-app-w08-rc1",
+  "description": "回滚演练专用错误配置 (受控失败注入, 对应 mission-week-08 第 4 天): 误将偏差硬限覆盖为 0.01%, 导致一切核对 (含 +1.05% 常规偏差) 都被阻断为 needs_review / SPEC_HARD_LIMIT_EXCEEDED —— 任务级冒烟 SMOKE-01 应当拦截 (answered -> needs_review 漂移)。该文件受控标注: 禁止用于真实发布, 仅作为回滚演练证据归档。",
+  "config_baseline": [
+    {
+      "config_key": "spec_check.hard_limit_deviation_pct",
+      "config_value": "15.0"
+    },
+    {
+      "config_key": "release.config_version",
+      "config_value": "sunroof-config-w08-v1"
+    }
+  ],
+  "config_overrides": [
+    {
+      "config_key": "spec_check.hard_limit_deviation_pct",
+      "config_value": "0.01"
+    },
+    {
+      "config_key": "release.config_version",
+      "config_value": "sunroof-config-w08-rc1-bad"
+    }
+  ]
+}

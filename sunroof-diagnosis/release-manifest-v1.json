@@ -1,0 +1,22 @@
+{
+  "manifest_version": "sunroof-release-manifest-v1",
+  "release_id": "sunroof-app-w08-r0",
+  "artifact_id": "sunroof-app-w08-r0",
+  "description": "天窗总成只读诊断 · 阶段 A 节点 05 发布冻结清单 (回链 ../fde-roadmap-v1.md §2 节点 ⑤ + specs/mission-week-08.md)。三类绑定: 代码基线 / 配置 sha256 / schema 版本; 清单不含任何秘密 (凭据只存在于 application/auth.py 与客户端会话, 由 ci/redaction_scan.py 静态门 + 动态测试复验)。",
+  "code_revision": {
+    "baseline_tag": "sunroof-w07-baseline",
+    "baseline_commit": "0b6b279c88518b69b28e66bf10358c5c2984d21b",
+    "policy": "每周只加层不改层: 节点 05 变更 = 部署层 (迁移 004 policy_config + 配置收敛器 + 任务级冒烟门 + CI 四阶段 + tests/test_deployment_release), 冻结面 (001-003 DDL/契约/引擎判定表/26 既有用例) 零改动"
+  },
+  "schema_version": "004",
+  "schema_note": "migrations/001-004 幂等可重放; 004 仅新增 policy_config 表 (收敛器唯一可写面) + 种子默认值, 不触碰 001-003 冻结 DDL",
+  "config_version": "sunroof-config-w08-v1",
+  "config_path": "config/sunroof-config-w08.json",
+  "config_sha256": "ec69ed4ce11cde1735225feb9fbfbb25db2d9ca848c8856826b394777ec2b44f",
+  "fixtures_version": "sunroof-fixtures-001-003 (specs 6 条 + spec_check_tasks 4 条, 迁移内嵌固定合成数据)",
+  "previous_known_good_release": "sunroof-w07-baseline (节点 04 双角色闭环, 26/26 全绿, 双冒烟全过)",
+  "deployment_entrypoint": "deploy-README.md",
+  "rollback_runbook": "ROLLBACK.md",
+  "smoke_gate": "deploy/smoke_w08.py (4/4 任务级三向对账, /health 200 不作为放量依据)",
+  "ci_entrypoint": "ci/run_local_ci.py (与 .github/workflows/sunroof-ci.yml 同一入口)"
+}
