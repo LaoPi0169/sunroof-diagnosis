@@ -9,6 +9,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# 运行时与构建期质量门都依赖 fastapi/uvicorn/pydantic/httpx
+# (tests 直接 import application.main -> fastapi; 构建期质量门在镜像内跑全量测试)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 # 全仓库拷贝: canary 管理按钮依赖 week-12 冻结答案键与 evaluation 考卷
 # (与 CI STAGE-4 git archive 冷部署口径一致); data/*.db 由 .dockerignore
 # 排除, 首次启动/构建期自动重建, 持久化交给数据卷。

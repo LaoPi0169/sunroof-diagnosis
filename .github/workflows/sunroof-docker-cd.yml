@@ -26,6 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 同 CI 通道: 冻结物按作者磁盘字节 (CRLF) 绑定 sha256, checkout 后必须重刷为 CRLF,
+      # 否则镜像构建期 build_corpus() 的逐字节校验必崩 (LF ≠ CRLF 哈希)。
+      - name: Re-materialize working tree as CRLF (byte-identical to author's frozen artifacts)
+        run: |
+          git config core.autocrlf true
+          git rm -q --cached -r .
+          git reset -q --hard
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

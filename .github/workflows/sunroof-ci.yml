@@ -24,6 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 冻结物 (corpus/eval/合同清单) 按"作者 Windows 磁盘字节"绑定 sha256 (CRLF)。
+      # Actions 默认 checkout 为 LF, 会破坏全部 raw 字节哈希互锁 —— 这里以 autocrlf=true
+      # 重刷工作区, 逐字节复现作者磁盘状态 (与本地 Windows 完全同口径)。
+      - name: Re-materialize working tree as CRLF (byte-identical to author's frozen artifacts)
+        run: |
+          git config core.autocrlf true
+          git rm -q --cached -r .
+          git reset -q --hard
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
