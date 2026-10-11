@@ -19,9 +19,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 排除, 首次启动/构建期自动重建, 持久化交给数据卷。
 COPY . /app
 
-# 构建期质量门: 重建语料库 + 全量集成测试 (失败则镜像构建失败)
-RUN python -c "from corpus.build_corpus import build_corpus; build_corpus()" \
-    && python -m unittest discover -s tests 2>&1 | tail -n 3
+# 构建期质量门: 重建语料库 (临时库) + 全量集成测试 (失败则镜像构建失败)。
+# 修正记录 (2026-10-11):
+#   1) build_corpus 的 db_path 是必填位置参数, 原写法 build_corpus() 在镜像内 TypeError 秒崩;
+#      构建期用 /tmp 临时库 (运行时由应用首启在数据卷内重建语料);
+#   2) 原 `| tail -n 3` 管道会吞掉 unittest 退出码 (sh 管道取末命令退出码) —— 测试失败将
+#      被误判为构建成功; 改为先落日志再回显尾部并以真实退出码结束。
+RUN python -c "from corpus.build_corpus import build_corpus; build_corpus('/tmp/corpus-w09-build.db')" \
+    && python -m unittest discover -s tests > /tmp/unittest.log 2>&1; rc=$?; tail -n 3 /tmp/unittest.log; exit $rc
 
 EXPOSE 8018
 
