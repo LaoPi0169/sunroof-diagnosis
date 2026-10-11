@@ -16,8 +16,8 @@
    - ci/redaction_scan.py (扫描器自身持有字面量清单才能检测违规)
    其余任何扫描范围内文件出现凭据明文即违规。
 
-扫描范围 (运行时代码): 不含 tests/ 与 verify_node03/verify_node04 —— 验证脚本与
-测试同属证据工具面 (其正文断言是刻意的安全验证内容, 非运行时日志)。
+扫描范围 (运行时代码, 节点 06 起含语料两文件): 不含 tests/ 与 verify_node03/verify_node04
+—— 验证脚本与测试同属证据工具面 (其正文断言是刻意的安全验证内容, 非运行时日志)。
 
 输出: JSON 报告 {scanned_files, emissions_checked, violations, passed}; 退出码 0=通过, 1=存在违规。
 """
@@ -28,7 +28,8 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 扫描范围 (运行时代码) —— 节点 05: 12 文件 (应用 6 + CLI 1 + 部署 2 + CI 2 + 本扫描器)
+# 扫描范围 (运行时代码) —— 节点 06 (Week 09): 13 文件 (应用 6 + CLI 1 + 部署 2 + CI 2
+#                + 语料 2 + 本扫描器)
 SCOPE_FILES = [
     os.path.join("application", "auth.py"),
     os.path.join("application", "database.py"),
@@ -41,6 +42,8 @@ SCOPE_FILES = [
     os.path.join("deploy", "smoke_w08.py"),
     os.path.join("ci", "redaction_scan.py"),
     os.path.join("ci", "run_local_ci.py"),
+    os.path.join("corpus", "build_corpus.py"),
+    os.path.join("corpus", "check_role_candidates.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)
