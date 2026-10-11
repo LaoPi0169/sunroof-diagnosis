@@ -50,6 +50,19 @@ SCOPE_FILES = [
     os.path.join("retrieval", "contract.py"),
     os.path.join("retrieval", "labels.py"),
     os.path.join("retrieval", "run_retrieval_comparison.py"),
+    os.path.join("generation", "contract.py"),
+    os.path.join("generation", "run_rag_evaluation.py"),
+    os.path.join("mcptool", "contract.py"),
+    os.path.join("mcptool", "case_store.py"),
+    os.path.join("mcptool", "server.py"),
+    os.path.join("mcptool", "approval.py"),
+    os.path.join("mcptool", "ticket_service.py"),
+    os.path.join("mcptool", "telemetry.py"),
+    os.path.join("mcptool", "kill_switch.py"),
+    os.path.join("mcptool", "run_fixtures.py"),
+    os.path.join("mcptool", "run_canary.py"),
+    os.path.join("mcptool", "run_degradation_drill.py"),
+    os.path.join("workbench_handoff", "app.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

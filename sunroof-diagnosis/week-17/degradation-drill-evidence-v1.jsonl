@@ -1,0 +1,4 @@
+{"drill_id": "D-01", "fault": "none", "pass": true, "terminal": "action_completed", "effects": 1}
+{"drill_id": "D-02", "fault": "mcp_off", "pass": true, "terminal": "action_preview", "effects": 0}
+{"drill_id": "D-03", "fault": "recovery_resume", "pass": true, "terminal": "action_completed", "effects": 1}
+{"drill_id": "D-04", "fault": "idempotent_replay", "pass": true, "terminal": "replayed", "effects": 0}
