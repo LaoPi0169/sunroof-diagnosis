@@ -1,0 +1,15 @@
+# 天窗异响诊断工作台镜像 —— 构建上下文瘦身 (不进镜像的本地垃圾)
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+# 运行时生成的库: 构建期由 build_corpus 自动重建, 持久化走数据卷
+data/*.db
+data/*.db-journal
+# 本地证据日志 (镜像里不需要; ci-evidence.md 本身保留)
+evidence/ci-run-*.log
+archive
+node_modules

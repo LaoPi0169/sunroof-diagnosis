@@ -1,0 +1,27 @@
+# 天窗异响诊断 · 值守交接工作台 —— 单容器编排
+# 用法: SUNROOF_ADMIN_TOKEN=你的口令 docker compose up -d --build
+services:
+  sunroof-workbench:
+    build: .
+    image: sunroof-workbench:latest
+    container_name: sunroof-workbench
+    ports:
+      - "8018:8018"
+    environment:
+      # 口令只经环境变量注入, 镜像与 git 里零硬编码 (脱敏扫描口径)
+      SUNROOF_ADMIN_TOKEN: ${SUNROOF_ADMIN_TOKEN:-sunroof-admin-w18}
+      SUNROOF_BIND: 0.0.0.0
+      SUNROOF_PORT: "8018"
+    volumes:
+      # 语料库/工单库持久化; 管理面"沙盒重置"只清进程内状态, 不动此卷
+      - sunroof-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8018/healthz',timeout=2); sys.exit(0 if r.status==200 else 1)"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  sunroof-data:
