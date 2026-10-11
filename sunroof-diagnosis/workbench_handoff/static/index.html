@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>天窗诊断 · 值守交接工作台 (8018)</title>
+<style>
+:root { --bg:#0f1419; --panel:#171e26; --line:#26313d; --ink:#e6edf3; --dim:#93a4b5;
+        --ok:#3fb96f; --warn:#e0a63c; --bad:#e05d5d; --acc:#4c9ffe; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--ink); font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif; padding:18px; }
+h1 { font-size:20px; } h2 { font-size:15px; margin-bottom:8px; color:var(--acc); }
+.wrap { max-width:1180px; margin:0 auto; }
+.bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:10px 0 18px; }
+.badge { padding:2px 10px; border-radius:10px; background:var(--line); font-size:12px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+input,select,button { background:#0d1218; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:7px 10px; font:inherit; }
+button { cursor:pointer; background:var(--acc); color:#04121f; border:none; font-weight:600; }
+button.sec { background:var(--line); color:var(--ink); }
+button.warn { background:var(--warn); }
+button.bad { background:var(--bad); color:#fff; }
+.row { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0; align-items:center; }
+.kv { color:var(--dim); font-size:12px; }
+.out { background:#0d1218; border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:8px; white-space:pre-wrap; word-break:break-all; font-size:12.5px; max-height:280px; overflow:auto; }
+.hidden { display:none; }
+.ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+.steps { display:flex; gap:6px; margin:8px 0; flex-wrap:wrap; }
+.step { padding:3px 10px; border-radius:10px; background:var(--line); font-size:12px; }
+.step.on { background:var(--acc); color:#04121f; font-weight:700; }
+.note { color:var(--dim); font-size:12px; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>天窗诊断 · 值守交接工作台 <span class="badge">端口 8018 · 双角色隔离</span></h1>
+  <div class="bar">
+    <span class="kv">当前角色</span>
+    <select id="role">
+      <option value="pqe">一线 PQE（OEM-A，项目组内）</option>
+      <option value="quality_supervisor">质量主管（跨项目只读 + 主管专属）</option>
+    </select>
+    <button class="sec" id="btnAdmin">管理员登录</button>
+    <span id="adminBadge" class="badge hidden ok">管理员已登录</span>
+    <span class="kv">教学模拟 · 零真实系统写入 · 全链确定性</span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>① 只读问答（门控 RAG · 带引用）</h2>
+      <div class="row"><input id="q" style="flex:1" placeholder="例如：东区复紧按什么顺序执行，工时怎么登记？"></div>
+      <div class="row"><button id="btnAsk">提问</button>
+        <span class="kv">示例：保修期内维修收费吗 / 索赔审批线 / 先换滑轨旧口径还能用吗 / 改装复位按什么口径答复</span></div>
+      <div id="askOut" class="out hidden"></div>
+    </div>
+    <div class="panel">
+      <h2>② 只读工具 case.lookup_context@1</h2>
+      <div class="row"><input id="caseId" style="flex:1" value="SR-1043"></div>
+      <div class="row"><button id="btnRead">只读取回 3 字段</button>
+        <span class="kv">SR-1042=受限示例 / SR-9001=跨租户示例</span></div>
+      <div id="readOut" class="out hidden"></div>
+      <div class="note">受限工单对一线不可见（封套与"不存在"逐字节一致）；主管可见。</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>③ 受控写流程（唯一允许效果：创建 1 张可取消主管复核单）</h2>
+    <div class="steps">
+      <span class="step" id="st1">1 预览</span><span class="step" id="st2">2 提交</span>
+      <span class="step" id="st3">3 审批</span><span class="step" id="st4">4 执行</span>
+      <span class="step" id="st5">5 核验/重放</span>
+    </div>
+    <div class="row">
+      <span class="kv">工单</span><input id="wCase" value="SR-1042" style="width:110px">
+      <span class="kv">队列</span><select id="wQueue"><option>billing-supervisor-review</option><option>executive-review</option></select>
+      <span class="kv">原因码</span><input id="wReason" value="policy_conflict" style="width:150px">
+      <button id="btnPreview">无副作用预览</button>
+      <button id="btnSubmit">提交</button>
+      <button id="btnApprove" class="warn hidden">管理员批准</button>
+      <button id="btnExecute">执行</button>
+      <button id="btnReplay" class="sec">幂等重放</button>
+    </div>
+    <div id="writeOut" class="out hidden"></div>
+    <div class="note">硬门：无审批或参数不匹配 = 外部效果 0；相同幂等键最多一个外部效果；执行后由 ticket.get 独立核验。</div>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>④ 任务追踪（九阶段 span）</h2>
+      <div class="row"><input id="traceId" style="flex:1" placeholder="task_id（执行后自动填入）"><button class="sec" id="btnTrace">还原路径</button></div>
+      <div id="traceOut" class="out hidden"></div>
+    </div>
+    <div class="panel">
+      <h2>⑤ 管理面（登录后可见，未登录 403）</h2>
+      <div id="adminLogin" class="row">
+        <input id="adminToken" type="password" placeholder="管理员口令（教学默认 sunroof-admin-w18）" style="flex:1">
+        <button id="btnLogin2">登录</button>
+      </div>
+      <div id="adminBody" class="hidden">
+        <div class="row">
+          <span class="kv">MCP_OFF</span><button id="btnMcpOff" class="bad">注入（降级演练）</button>
+          <button id="btnMcpOn" class="sec">恢复</button>
+          <span class="kv">回滚</span><button class="sec" id="btnRollback">重放 known-good 配置</button>
+        </div>
+        <div class="row">
+          <button class="sec" id="btnCanary">金丝雀重考 60 例</button>
+          <button class="sec" id="btnAudit">审计</button>
+          <button class="sec" id="btnReset">重置沙盒任务</button>
+        </div>
+        <div id="adminOut" class="out hidden"></div>
+        <div class="note">降级演练：MCP_OFF 后执行写任务 → 停在 action_preview（0 效果、审批不消耗）；恢复后同一审批续跑。</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>诚实边界</h2>
+    <div class="note">问答/工具/写入全部复用第 12-17 周冻结实现；生成层为确定性抽取式教学替身（零 LLM）；工单为隔离模拟服务；保留集自我封存 ≠ 独立盲测；本工作台用于课程验收演练，不构成生产就绪声明。</div>
+  </div>
+</div>
+<script>
+var adminSession = null, currentTask = null;
+function el(id){ return document.getElementById(id); }
+function show(id, text){ var box = el(id); box.classList.remove("hidden"); box.textContent = typeof text === "string" ? text : JSON.stringify(text, null, 2); }
+function api(path, body, cb){
+  fetch(path, {method:"POST", headers:{"Content-Type":"application/json",
+    "X-Admin-Session": adminSession || ""}, body: JSON.stringify(body || {})})
+    .then(function(r){ return r.json().then(function(j){ return {status:r.status, json:j}; }); })
+    .then(function(r){ cb(r.status, r.json); })
+    .catch(function(e){ cb(0, {error:String(e)}); });
+}
+function step(n){ for (var i=1;i<=5;i++){ el("st"+i).className = "step" + (i<=n ? " on":""); } }
+function renderAsk(d){
+  var badge = {answered:"answered", refused:"refused", needs_review:"needs_review", escalated:"escalated"}[d.state] || d.state;
+  var text = "状态: [" + badge + "]  置信: " + (d.confidence_top1||0) + "\n";
+  if (d.answer_text) text += "回答: " + d.answer_text + "\n";
+  if (d.citations && d.citations.length) text += "引用: " + d.citations[0].chunk_id + " (版本 " + d.citations[0].source_version + ", " + d.citations[0].effective_status + ")\n";
+  if (d.reason_code) text += "原因码: " + d.reason_code + "\n";
+  text += "下一步: " + (d.user_next_step || "-");
+  show("askOut", text);
+}
+el("btnAsk").onclick = function(){
+  api("/api/ask", {role: el("role").value, query: el("q").value}, function(s, d){ renderAsk(d); });
+};
+el("q").addEventListener("keydown", function(e){ if (e.key === "Enter") el("btnAsk").click(); });
+el("btnRead").onclick = function(){
+  api("/api/tool/read", {role: el("role").value, case_id: el("caseId").value}, function(s, d){ show("readOut", d); });
+};
+el("btnPreview").onclick = function(){
+  api("/api/write/preview", {args: writeArgs()}, function(s, d){ step(1); show("writeOut", d); });
+};
+function writeArgs(){
+  return {case_id: el("wCase").value, queue: el("wQueue").value,
+          reason_code: el("wReason").value,
+          source_refs: ["retrofit-bulletin-v2", "retrofit-notice-v4"],
+          idempotency_key: "wb-" + el("wCase").value + ":1"};
+}
+el("btnSubmit").onclick = function(){
+  api("/api/write/submit", {role: el("role").value, args: writeArgs()}, function(s, d){
+    currentTask = d.task_id; approvalId = d.approval_id;
+    el("traceId").value = d.task_id || "";
+    step(2);
+    if (d.state === "approval_required") { el("btnApprove").classList.remove("hidden"); }
+    else { step(3); el("btnApprove").classList.add("hidden"); }
+    show("writeOut", d);
+  });
+};
+el("btnApprove").onclick = function(){
+  api("/api/write/approve", {task_id: currentTask}, function(s, d){
+    step(3); el("btnApprove").classList.add("hidden"); show("writeOut", d);
+  });
+};
+el("btnExecute").onclick = function(){
+  api("/api/write/execute", {task_id: currentTask}, function(s, d){
+    step(4); if (d.ok) { step(5); }
+    show("writeOut", d);
+  });
+};
+el("btnReplay").onclick = function(){
+  api("/api/write/execute", {task_id: currentTask}, function(s, d){
+    step(5); show("writeOut", d);
+  });
+};
+el("btnTrace").onclick = function(){
+  api("/api/task", {task_id: el("traceId").value}, function(s, d){ show("traceOut", d); });
+};
+function adminLogin(){
+  api("/api/admin/login", {token: el("adminToken").value}, function(s, d){
+    if (d.session) { adminSession = d.session;
+      el("adminBody").classList.remove("hidden");
+      el("adminBadge").classList.remove("hidden");
+      el("adminLogin").classList.add("hidden");
+    } else { show("adminOut", d); }
+  });
+}
+el("btnLogin2").onclick = adminLogin;
+el("btnAdmin").onclick = function(){ el("adminToken").focus(); el("adminLogin").classList.remove("hidden"); };
+el("btnMcpOff").onclick = function(){
+  api("/api/admin/switch", {switch:"MCP_OFF", on:true, operator:"admin", reason:"降级演练"}, function(s, d){ show("adminOut", d); });
+};
+el("btnMcpOn").onclick = function(){
+  api("/api/admin/switch", {switch:"MCP_OFF", on:false, operator:"admin", reason:"恢复复验通过"}, function(s, d){ show("adminOut", d); });
+};
+el("btnRollback").onclick = function(){
+  api("/api/admin/rollback", {reason:"演练回滚"}, function(s, d){ show("adminOut", d); });
+};
+el("btnCanary").onclick = function(){
+  api("/api/admin/canary", {}, function(s, d){ show("adminOut", d); });
+};
+el("btnAudit").onclick = function(){
+  fetch("/api/admin/audit", {headers:{"X-Admin-Session": adminSession || ""}})
+    .then(function(r){ return r.json(); }).then(function(d){ show("adminOut", d); });
+};
+el("btnReset").onclick = function(){
+  api("/api/admin/reset", {}, function(s, d){ show("adminOut", d); });
+};
+</script>
+</body>
+</html>

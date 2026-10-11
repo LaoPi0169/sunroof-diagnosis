@@ -1,0 +1,18 @@
+{"tickets": [
+{"case_id": "SR-1042", "tenant": "sunroof-east", "task_type": "policy_conflict", "region": "east", "purchased_at": "2026-03-01", "note": "restricted"},
+{"case_id": "SR-1043", "tenant": "sunroof-east", "task_type": "torque_retorque", "region": "east", "purchased_at": "2026-06-15", "note": "general"},
+{"case_id": "SR-1044", "tenant": "sunroof-east", "task_type": "noise_response", "region": "east", "purchased_at": "2026-02-11", "note": "general"},
+{"case_id": "SR-1045", "tenant": "sunroof-east", "task_type": "drainage", "region": "east", "purchased_at": "2026-05-20", "note": "general"},
+{"case_id": "SR-1046", "tenant": "sunroof-east", "task_type": "warranty_voucher", "region": "east", "purchased_at": "2026-01-30", "note": "general"},
+{"case_id": "SR-1047", "tenant": "sunroof-east", "task_type": "claim_supervisor", "region": "east", "purchased_at": "2026-08-01", "note": "restricted"},
+{"case_id": "SR-1048", "tenant": "sunroof-east", "task_type": "glass_alignment", "region": "east", "purchased_at": "2026-04-02", "note": "general"},
+{"case_id": "SR-1049", "tenant": "sunroof-east", "task_type": "retrofit_reset", "region": "east", "purchased_at": "2026-04-20", "note": "conflict"},
+{"case_id": "SR-1050", "tenant": "sunroof-east", "task_type": "torque_retorque", "region": "east", "purchased_at": "2026-06-18", "note": "general"},
+{"case_id": "SR-1051", "tenant": "sunroof-east", "task_type": "noise_response", "region": "east", "purchased_at": "2026-03-03", "note": "general"},
+{"case_id": "SR-1052", "tenant": "sunroof-east", "task_type": "drainage", "region": "east", "purchased_at": "2026-06-01", "note": "general"},
+{"case_id": "SR-1053", "tenant": "sunroof-east", "task_type": "escalation_review", "region": "east", "purchased_at": "2026-07-01", "note": "general"},
+{"case_id": "SR-1054", "tenant": "sunroof-east", "task_type": "warranty_voucher", "region": "east", "purchased_at": "2026-02-25", "note": "general"},
+{"case_id": "SR-1055", "tenant": "sunroof-east", "task_type": "glass_alignment", "region": "east", "purchased_at": "2026-05-05", "note": "general"},
+{"case_id": "SR-9001", "tenant": "sunroof-north", "task_type": "torque_retorque", "region": "north", "purchased_at": "2026-06-10", "note": "cross-tenant"},
+{"case_id": "SR-9002", "tenant": "sunroof-north", "task_type": "claim_supervisor", "region": "north", "purchased_at": "2026-08-15", "note": "cross-tenant"}
+]}

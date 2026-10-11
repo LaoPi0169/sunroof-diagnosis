@@ -102,6 +102,40 @@ Week 11 变化点：
 - 失败登记 6 条含两条 corpus 层（冲突对/过期件 0 chunk 是第 9 周设计，检索层不可见
   不可修——最诚实一条）；登记初稿 2 处与实况不符已对照 results 文件纠正。
 
+## 8. Week 12-15 —— 只读 RAG 收官 + MCP 工具周 + 对抗（节点 ⑨-⑫，2026-10-10）
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-004（冻结面零改动） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/**RAG 6 + 对抗 6**） | PASS（**75 tests**） |
+| STAGE-3-redaction | `ci/redaction_scan.py`（**32 文件**，generation/mcptool 入列） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+变化点：`generation/` 门控决策树（一轮受控标定后 60/60 状态门，L5=1.0、L6=28/28
+单句逐字引用、L7=0 泄漏；保留集解封恰一次，同源自评污染披露照登）；`mcptool/`
+只读 case.lookup_context@1（四级鉴权、不可区分错误封套）+ 受控写 ticket.create@1
+（单一规范化/结构化审批/幂等重放先于用尽/ticket.get 独立核验）；7 攻击卡全部防御
+成立（0 效果 0 泄漏），词面护栏失效面如实登记（A-08）。
+
+## 9. Week 16-18 —— 可观测 + 降级 + 值守交接工作台（节点 ⑬-⑭，最终交付，2026-10-10）
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-004（冻结面零改动） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/**遥测/降级 8 + 交接 6**） | PASS（**75 tests，OK**） |
+| STAGE-3-redaction | `ci/redaction_scan.py`（**32 文件** / 50 输出点，workbench 入列） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+变化点：遥测 TaskTrace 九阶段 + 终态分类 v1.1（action_preview 增补不改写六类）+
+SLI 三口径独立（空窗分母 None 不编造）+ span 脱敏自检；金丝雀 60 例重考
+behavior_drift=[] CONSISTENT；关闭开关封闭枚举 + 追加审计 + 无因拒绝；降级门
+**权限判定优先于降级**（MCP_OFF+无审批=approval_denied；+有效审批=action_preview
+0 效果审批不消耗，恢复后同一审批续跑）；D-01..04 演练 forbidden=0。
+**最终交付物**: `workbench_handoff/` 8018 双角色交互工作台（业务用户: 问答带引用/
+只读工具/受控写全流程/任务追踪；管理员: 开关/回滚/审计/金丝雀/重置；403 强制；
+口令/session 零出现；真机验证首页 200 + 未登录 403）+ `start_workbench_handoff.bat`。
+合并里程碑口径与逐周差异见 `specs/mission-week-12-18.md`。
+
 ## 诚实边界
 
 CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称分布式 CI/容器化/制品库推送；

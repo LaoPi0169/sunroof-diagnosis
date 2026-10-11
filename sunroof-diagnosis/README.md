@@ -12,7 +12,9 @@
 | ⑥ 语料治理（阶段 B · 第 9 周） | `option-note-v1.md` + `knowledge-owner-acl-matrix-v1.md` + `corpus/`（schema/构建器/角色候选核查器）+ `corpus/sources/` 8 份合成材料 + `corpus-manifest-v1.json`（sha256 绑定）+ `ingestion-isolation-report-v1.md` + `role-candidate-check-v1.md` + `corpus-card-v1.md` + `source-review-note-v1.md` + **6/6 语料治理测试全绿（41/41 总）** | ✅ |
 | ⑦ 评测合同冻结（阶段 B · 第 10 周） | `eval-plan-v1.md` + `eval-set-v1.jsonl`（60 例 = 36 开发 + 12 校准 + 12 保留封存）+ `eval-holdout-labels-sealed-v1.json` + `labeling-guide-v1.md`（48 例公开标签附录）+ `dataset-card-v1.md` + `split-leakage-check-v1.md` + `deterministic-baseline-results-v1.jsonl` + `evaluation/`（合同常量/校验器/确定性基线探针）+ `evaluation-freeze-record-v1.md`（12 件 sha256 双口径）+ `specs/mission-week-10.md` + **6/6 评测合同测试全绿（47/47 总）** | ✅ |
 | ⑧ 检索基线比较（阶段 B · 第 11 周） | `week-11/retrieval-comparison-manifest-v1.json`（三输入件 sha256 绑定，先冻结后运行）+ `week-11/keyword-results-v1.jsonl`·`vector-results-v1.jsonl`（48 例 × 2 检索器 × 20 字段）+ 失败登记 6 条 / 回归种子 12 条 / 基线报告 / `retriever-decision-v1.md`（vector 单路晋级）+ `retrieval/`（统一合同 / 标签装载 / 比较运行器）+ **6/6 检索比较测试全绿（53/53 总）** | ✅ |
-| 阶段 B（剩余） | 只读 RAG 评测 / 只读 MCP / 受控写审批 | ⬜ 后续 |
+| ⑨-⑫ 只读 RAG 收官 + MCP 工具周（W12-15） | `generation/`（门控决策树 + 抽取式替身 + unseal-once 评测器）+ `week-12/rag-per-case-results-v1.jsonl`（60 例解封一次，状态门 60/60，L5=1.0/L6=28/28/L7=0）+ `week-12/rag-evaluation-report-v1.md`·`decision-memo-03.md`（继续但冻结）+ `mcptool/`（只读 case.lookup_context@1 四级鉴权 + 受控写 ticket.create@1 单一规范化/结构化审批/幂等/独立核验）+ `mcptool/run_fixtures.py`（R5+W5 全过, 效果对账恰 1）+ `week-15/attack-cases-v1.md` 7 攻击卡全部防御成立 + `specs/mission-week-12-18.md` | ✅ |
+| ⑬-⑭ 可观测 + 降级 + 值守交接（W16-18，最终交付） | `mcptool/telemetry.py`（TaskTrace 九阶段/终态分类 v1.1/SLI 三口径独立/span 脱敏自检）+ `mcptool/run_canary.py`（60 例重考 CONSISTENT 零漂移）+ `mcptool/kill_switch.py`（封闭枚举+追加审计+无因拒绝）+ 降级门（权限判定优先于降级, action_preview 0 效果审批不消耗）+ `week-17/degradation-drill-evidence-v1.jsonl` + **`workbench_handoff/`（端口 8018 双角色交互工作台: 业务用户问答/工具/受控写全流程, 管理员开关/回滚/审计/金丝雀/重置, 403 强制, 口令零出现）** + `start_workbench_handoff.bat` | ✅ |
+| 阶段 C | （路线图后续: 真实集成/Capstone） | ⬜ 后续 |
 
 ## 架构（阶段 A 节点 ②③④⑤ 落地部分）
 ```
@@ -44,7 +46,7 @@
      2. 引擎硬限读配置 (缺失/非法回退默认 15.0, known-good 下行为逐字节等价)
      3. 任务级冒烟门 deploy/smoke_w08.py 4 条三向对账: /health 200 ≠ 业务正确, 4/4 才放量
      4. CI 四阶段 ci/run_local_ci.py (= .github/workflows/sunroof-ci.yml 同一入口):
-        STAGE-1 Schema -> STAGE-2 53 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
+        STAGE-1 Schema -> STAGE-2 75 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
      5. 回滚 = 配置收敛式 (重放 known-good, ROLLBACK.md 场景 A-E); 演练 runner 三段闭环落证据
 
 [语料层 (节点 06, 阶段 B)] corpus/build_corpus.py (零模型调用; 语料 schema 独立, 冻结迁移 001-004 零改动)
@@ -62,7 +64,15 @@
 ```bash
 pip install -r requirements.txt          # 或复用上级仓库 .venv
 uvicorn application.main:app --port 8020 # 勿与原仓库 8016-8018 冲突
-python -m unittest discover -s tests -v  # 53 个集成测试 (独立临时库, 100% 确定; 含语料 6 + 评测 6 + 检索 6 用例)
+python -m unittest discover -s tests -v  # 75 个集成测试 (独立临时库, 100% 确定)
+
+# —— 节点 ⑨-⑭ (W12-18): 只读 RAG 收官 / MCP 工具 / 对抗 / 可观测 / 降级 / 交接工作台 ——
+python -m generation.run_rag_evaluation            # unseal-once 只读对账: 60/60 状态门, L6 引用 28/28, L7=0
+python -m mcptool.run_fixtures                     # R5+W5 夹具: 效果对账恰 1, all_pass
+python -m mcptool.run_canary                       # 金丝雀重考 60 例: behavior_drift=[] CONSISTENT
+python -m mcptool.run_degradation_drill            # D-01..04 降级演练: forbidden=0
+start_workbench_handoff.bat                        # 8018 双角色交互工作台 (最终可交互验收交付物)
+
 python verify_node03.py                  # 节点 ③ 冒烟: 摄取/对账/重放/引擎回接, 证据落 evidence/
 python verify_node04.py                  # 节点 ④ 冒烟: 闭环/幂等/RBAC/主管结案/跨项目 denied, 证据落 evidence/
 python workbench_cli.py                  # 双角色任务工作台 CLI (需先启动 API; Token 登录 -> 队列 -> 三要素核验 -> 动作)
