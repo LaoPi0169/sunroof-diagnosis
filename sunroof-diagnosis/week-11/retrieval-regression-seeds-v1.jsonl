@@ -1,0 +1,13 @@
+{"seed_id": "SR-01", "case_id": "SR-DEV-01", "retriever_id": "keyword-bm25-v1", "locked_expectation": "best_gold_rank=1;gold=torque-east-v5", "note": "复紧顺序/工时进 top-1"}
+{"seed_id": "SR-02", "case_id": "SR-DEV-02", "retriever_id": "keyword-bm25-v1", "locked_expectation": "best_gold_rank=1;gold=torque-east-v5", "note": "单工位工时"}
+{"seed_id": "SR-03", "case_id": "SR-DEV-10", "retriever_id": "keyword-bm25-v1", "locked_expectation": "best_gold_rank=1;gold=service-general-v3", "note": "异响首响三步"}
+{"seed_id": "SR-04", "case_id": "SR-DEV-13", "retriever_id": "keyword-bm25-v1", "locked_expectation": "best_gold_rank=1;gold=service-general-v3", "note": "保修口径"}
+{"seed_id": "SR-05", "case_id": "SR-DEV-31", "retriever_id": "keyword-bm25-v1", "locked_expectation": "recall_denominator=0;restricted_candidate_count=0", "note": "pqe 受限族零可见零泄漏"}
+{"seed_id": "SR-06", "case_id": "SR-DEV-34", "retriever_id": "keyword-bm25-v1", "locked_expectation": "best_gold_rank=1;gold=claim-supervisor-v2", "note": "主管可见受限细则"}
+{"seed_id": "SR-07", "case_id": "SR-DEV-01", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "best_gold_rank=1;confidence_top1>=0.37", "note": "晋级路径置信下界内"}
+{"seed_id": "SR-08", "case_id": "SR-DEV-02", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "best_gold_rank=1", "note": "复紧顺序"}
+{"seed_id": "SR-09", "case_id": "SR-DEV-10", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "best_gold_rank=1;gold=service-general-v3", "note": "首响"}
+{"seed_id": "SR-10", "case_id": "SR-DEV-17", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "confidence_top1<=0.3866", "note": "无答案族置信上界 (F11-04 口径)"}
+{"seed_id": "SR-11", "case_id": "SR-DEV-23", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "recall_at_5=0.0;gold=retrofit-bulletin-v2+retrofit-notice-v4", "note": "冲突件零 chunk 是语料层事实 (F11-01)"}
+{"seed_id": "SR-12", "case_id": "SR-DEV-27", "retriever_id": "vector-hashed-ngram-v1", "locked_expectation": "recall_at_5=0.0;gold=service-general-v1", "note": "过期件零 chunk 是语料层事实 (F11-02)"}
+

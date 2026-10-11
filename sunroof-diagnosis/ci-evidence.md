@@ -79,6 +79,29 @@ Week 10 变化点：
 - 工具链勘误（如实）：工作区根存在同名参考仓库，PowerShell .NET API 相对路径曾把哈希
   量到根仓库文件 —— 冻结哈希一律以 Python cwd 口径重算并复测（哈希振荡假象由此而来）。
 
+## 7. Week 11 —— 检索基线比较（节点 ⑧，2026-10-10）
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-004（冻结面零改动） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/**检索比较**） | PASS（**53 tests，OK = 47 + 检索 6**） |
+| STAGE-3-redaction | `ci/redaction_scan.py` 静态扫描（**19 文件**，retrieval 三件入列） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+Week 11 变化点：
+
+- STAGE-2 47 → 53（新增 `tests/test_retrieval_comparison.py` 6 用例：清单 sha256 互锁 /
+  20 字段 schema + ACL 独立复算 / 确定性投影重跑 / holdout 零执行 / 失败登记对账 /
+  回归种子 12 条复验）；
+- 正式运行 48 例 × 2 检索器一次通过：Recall@5 双双 1.0（13/18-chunk 小池饱和值），
+  rank-1 20/20；pqe 受限候选逐例 0；holdout 12 条零执行；cost_estimate_usd=0；
+- 置信信号实测：vector top-1 有界（0.24–0.61）但 no_answer/conflict 与 answerable
+  存在薄重叠（0.3712–0.3866，F11-04）；BM25 无域外信号（F11-03）；
+- 裁定 `vector-hashed-ngram-v1` 单路晋级第 12 周（依据有界可对照信号，不靠饱和
+  Recall@5），keyword 降级路径；类阈值不冻结，移交第 12 周保留集验证；
+- 失败登记 6 条含两条 corpus 层（冲突对/过期件 0 chunk 是第 9 周设计，检索层不可见
+  不可修——最诚实一条）；登记初稿 2 处与实况不符已对照 results 文件纠正。
+
 ## 诚实边界
 
 CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称分布式 CI/容器化/制品库推送；

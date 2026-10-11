@@ -11,7 +11,8 @@
 | ⑤ 部署与回滚 | `release-manifest-v1.json` + `deploy-README.md` + `ROLLBACK.md` + 迁移 004（policy_config）+ `deploy/apply_policy_config.py`（配置收敛器）+ `deploy/smoke_w08.py`（4 条任务级冒烟门）+ `deploy/run_rollback_drill.py` + `ci/run_local_ci.py`（四阶段）+ `ci/redaction_scan.py` + 7 份 W8 文档 + `adr-004` + **9/9 部署发布测试全绿（35/35 总）** | ✅（阶段 A 封存） |
 | ⑥ 语料治理（阶段 B · 第 9 周） | `option-note-v1.md` + `knowledge-owner-acl-matrix-v1.md` + `corpus/`（schema/构建器/角色候选核查器）+ `corpus/sources/` 8 份合成材料 + `corpus-manifest-v1.json`（sha256 绑定）+ `ingestion-isolation-report-v1.md` + `role-candidate-check-v1.md` + `corpus-card-v1.md` + `source-review-note-v1.md` + **6/6 语料治理测试全绿（41/41 总）** | ✅ |
 | ⑦ 评测合同冻结（阶段 B · 第 10 周） | `eval-plan-v1.md` + `eval-set-v1.jsonl`（60 例 = 36 开发 + 12 校准 + 12 保留封存）+ `eval-holdout-labels-sealed-v1.json` + `labeling-guide-v1.md`（48 例公开标签附录）+ `dataset-card-v1.md` + `split-leakage-check-v1.md` + `deterministic-baseline-results-v1.jsonl` + `evaluation/`（合同常量/校验器/确定性基线探针）+ `evaluation-freeze-record-v1.md`（12 件 sha256 双口径）+ `specs/mission-week-10.md` + **6/6 评测合同测试全绿（47/47 总）** | ✅ |
-| 阶段 B（剩余） | 检索基线比较 / 只读 RAG 评测 / 只读 MCP / 受控写审批 | ⬜ 后续 |
+| ⑧ 检索基线比较（阶段 B · 第 11 周） | `week-11/retrieval-comparison-manifest-v1.json`（三输入件 sha256 绑定，先冻结后运行）+ `week-11/keyword-results-v1.jsonl`·`vector-results-v1.jsonl`（48 例 × 2 检索器 × 20 字段）+ 失败登记 6 条 / 回归种子 12 条 / 基线报告 / `retriever-decision-v1.md`（vector 单路晋级）+ `retrieval/`（统一合同 / 标签装载 / 比较运行器）+ **6/6 检索比较测试全绿（53/53 总）** | ✅ |
+| 阶段 B（剩余） | 只读 RAG 评测 / 只读 MCP / 受控写审批 | ⬜ 后续 |
 
 ## 架构（阶段 A 节点 ②③④⑤ 落地部分）
 ```
@@ -43,7 +44,7 @@
      2. 引擎硬限读配置 (缺失/非法回退默认 15.0, known-good 下行为逐字节等价)
      3. 任务级冒烟门 deploy/smoke_w08.py 4 条三向对账: /health 200 ≠ 业务正确, 4/4 才放量
      4. CI 四阶段 ci/run_local_ci.py (= .github/workflows/sunroof-ci.yml 同一入口):
-        STAGE-1 Schema -> STAGE-2 47 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
+        STAGE-1 Schema -> STAGE-2 53 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
      5. 回滚 = 配置收敛式 (重放 known-good, ROLLBACK.md 场景 A-E); 演练 runner 三段闭环落证据
 
 [语料层 (节点 06, 阶段 B)] corpus/build_corpus.py (零模型调用; 语料 schema 独立, 冻结迁移 001-004 零改动)
@@ -61,7 +62,7 @@
 ```bash
 pip install -r requirements.txt          # 或复用上级仓库 .venv
 uvicorn application.main:app --port 8020 # 勿与原仓库 8016-8018 冲突
-python -m unittest discover -s tests -v  # 47 个集成测试 (独立临时库, 100% 确定; 含语料治理 6 + 评测合同 6 用例)
+python -m unittest discover -s tests -v  # 53 个集成测试 (独立临时库, 100% 确定; 含语料 6 + 评测 6 + 检索 6 用例)
 python verify_node03.py                  # 节点 ③ 冒烟: 摄取/对账/重放/引擎回接, 证据落 evidence/
 python verify_node04.py                  # 节点 ④ 冒烟: 闭环/幂等/RBAC/主管结案/跨项目 denied, 证据落 evidence/
 python workbench_cli.py                  # 双角色任务工作台 CLI (需先启动 API; Token 登录 -> 队列 -> 三要素核验 -> 动作)
@@ -87,6 +88,12 @@ python evaluation/run_deterministic_baseline.py
                                          # 确定性基线探针: 60 例两次运行逐字节一致 (answered 20/needs_review 8/not_applicable 20/sealed 12)
 python ci/run_local_ci.py --evidence-file evidence/ci-run-w10.log
                                          # Week 10 复跑 CI 四阶段 (STAGE-2 47 用例, 评测合同 6 用例并入)
+
+# —— 节点 ⑧ 检索基线比较 (阶段 B · 第 11 周 · 零生成零业务效果) ——
+python -m retrieval.run_retrieval_comparison
+                                         # 48 例 × 2 检索器一次正式运行: 双跑投影逐行一致 + holdout 零执行 + pqe 受限候选逐例 0
+python ci/run_local_ci.py --evidence-file evidence/ci-run-w11.log
+                                         # Week 11 复跑 CI 四阶段 (STAGE-2 53 用例, 检索比较 6 用例并入)
 ```
 可信身份 Token（教学模拟）：`token_pqe_oem_a` / `token_pqe_oem_b` / `token_qa_supervisor_secret`（跨项目只读）；缺失 Token = 默认 PQE 培训身份；未知 Token = 401。
 
