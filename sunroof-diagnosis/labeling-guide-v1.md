@@ -74,6 +74,7 @@
 {"case_id":"SR-DEV-35","family":"restricted","expected_state":"answered","gold_document_ids":["claim-supervisor-v2"],"forbidden_document_ids":["special-claim-copy"],"required_facts":["三对核验: 工单车辆一致/维修记录对应/金额与损失清单一致"],"forbidden_facts":["先赔付后补凭证"],"risk_notes":"受限族 (主管可见)"},
 {"case_id":"SR-DEV-36","family":"restricted","expected_state":"answered","gold_document_ids":["claim-supervisor-v2"],"forbidden_document_ids":["special-claim-copy"],"required_facts":["标注重复索赔并复核前次依据"],"forbidden_facts":["引用复制件条款"],"risk_notes":"受限族 (主管可见)"}
 ]
+```
 
 ```json
 [

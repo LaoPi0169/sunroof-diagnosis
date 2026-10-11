@@ -47,6 +47,9 @@ SCOPE_FILES = [
     os.path.join("evaluation", "eval_contract.py"),
     os.path.join("evaluation", "validate_eval_set.py"),
     os.path.join("evaluation", "run_deterministic_baseline.py"),
+    os.path.join("retrieval", "contract.py"),
+    os.path.join("retrieval", "labels.py"),
+    os.path.join("retrieval", "run_retrieval_comparison.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

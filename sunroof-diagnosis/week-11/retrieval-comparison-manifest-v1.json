@@ -1,0 +1,25 @@
+{
+  "manifest": "retrieval-comparison-manifest-v1",
+  "frozen_at": "2026-10-10 (阶段 B · 节点 ⑧, 先冻结后运行)",
+  "decision": "两路零生成检索器 (keyword BM25 vs 确定性哈希向量) 哪一路作为单路候选晋级第 12 周只读 RAG 评测, 另一路降级为对照/降级路径",
+  "decision_role": "课程作者 (学习者), 裁定证据含名次与置信信号, 不单靠饱和 Recall@5",
+  "input_bindings": {
+    "eval_set": {"path": "eval-set-v1.jsonl", "sha256_lf": "7e79f59bfeb0a5bf50e991310b846fec26c8df8f48387720195de79ca910eaca"},
+    "labeling_guide": {"path": "labeling-guide-v1.md", "sha256_lf": "331dcfb267e0108e05a87285a182f992a9515dd7de15b8aa7ea80e6d30a66fbd"},
+    "corpus_manifest": {"path": "corpus-manifest-v1.json", "sha256_lf": "82e16521ba6d9561143b7d87095225e55a709df35ddb78b3489254e3aa735ffd"}
+  },
+  "protocol": {
+    "case_scope": "dev 36 + cal 12 = 48 例; holdout 12 例 not_executed",
+    "top_k": 5,
+    "retrievers": {"A": "keyword-bm25-v1 (纯标准库 BM25, k1=1.5, b=0.75, CJK 单字+双字+ASCII 词元)", "B": "vector-hashed-ngram-v1 (blake2b -> 512 维, tf+L2 归一, 余弦)"},
+    "tie_break": "(-score, chunk_id) 确定性定序",
+    "primary_metric": "Recall@5 (晋级门 >= 0.7)",
+    "denominator": "该例 gold 文档数 (labeling-guide-v1.md 公开标签附录)",
+    "aux_metrics": ["gold 最佳名次", "rank-1 计数", "受限族名次", "置信信号 top-1 分布"],
+    "acl": "候选池 = 第 9 周 candidates_for(role) 下推池; 主管专属 chunk 在受限角色逐例必须为 0",
+    "holdout_policy": "not_executed",
+    "change_budget": "0/1 (每检索器一次正式运行, 第二遍仅用于确定性断言)",
+    "forbidden": ["零 LLM 调用", "不用比较结果回头改评测集或语料", "不为过线事后改协议/删难题/降门槛"]
+  },
+  "outputs": ["week-11/keyword-results-v1.jsonl", "week-11/vector-results-v1.jsonl"]
+}

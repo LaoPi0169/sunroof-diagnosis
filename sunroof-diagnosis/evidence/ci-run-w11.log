@@ -1,0 +1,10 @@
+CI RUN 2026-10-11T04:18:26+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 53 tests in 18.656s, exit=0
+}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+[PASS] STAGE-3-redaction :: scanned_files=19; emissions_checked=45; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-l7dler1e; port=50352; smokes_passed=4/4
+CI RESULT OK | duration=21.2s | 2026-10-11T04:18:47+00:00 (UTC)
+
