@@ -3,7 +3,9 @@ name: northstar-week08-ci
 on:
   push:
     branches: [main, week08]
+    paths-ignore: ['sunroof-diagnosis/**']
   pull_request:
+    paths-ignore: ['sunroof-diagnosis/**']
   workflow_dispatch:
 
 jobs:

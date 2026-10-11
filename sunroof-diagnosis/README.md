@@ -1,4 +1,6 @@
 # 天窗总成只读诊断（Sunroof Read-Only Diagnosis）· 阶段 A + 阶段 B 进展
+[![CI](https://github.com/LaoPi0169/sunroof-diagnosis/actions/workflows/sunroof-ci.yml/badge.svg)](https://github.com/LaoPi0169/sunroof-diagnosis/actions/workflows/sunroof-ci.yml)
+[![Docker CD](https://github.com/LaoPi0169/sunroof-diagnosis/actions/workflows/sunroof-docker-cd.yml/badge.svg)](https://github.com/LaoPi0169/sunroof-diagnosis/actions/workflows/sunroof-docker-cd.yml)
 按《FDE 成长路线图》(`../fde-roadmap-v1.md`) 对「PQE 跨 MES/QMS/PLM 只读调取与对账」业务场景逐步展开的本项目自包含子仓库。**阶段目标：一键跨系统对账 + ACL 隔离跨主机厂敏感图纸 + 缺失/冲突/过期明确拒答 + 带引用的根因分析报告草稿。**
 
 ## 当前状态（阶段 A 节点 ①–⑤ 已完成并封存；阶段 B 节点 ⑥⑦ 已完成）

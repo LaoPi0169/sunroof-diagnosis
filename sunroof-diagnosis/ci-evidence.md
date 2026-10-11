@@ -162,3 +162,13 @@ supervisor 直写 forbidden 0 效果 ✓。
 
 CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称分布式 CI/容器化/制品库推送；
 `evidence/ci-run-w08.log` 的运行时刻戳随每次复跑追加，以 git 提交记录为准对照代码基线。
+
+### §9.2 CI/CD 通道建立（2026-10-11）：GitHub Actions 双流水线
+
+远程仓库 `https://github.com/LaoPi0169/sunroof-diagnosis.git`（main + 全部 9 个 sunroof tag 已同步）。
+- CI: `.github/workflows/sunroof-ci.yml` —— 四阶段同一入口（py3.11 与镜像同版），证据 artifact 随 run 归档，
+  触发面 = `sunroof-diagnosis/**` 的 push / PR / `sunroof-*` tag / 手动。
+- CD: `.github/workflows/sunroof-docker-cd.yml` —— main push → `latest`+`sha-*` 镜像；`sunroof-*` tag → 同名版本镜像，
+  发布至 `ghcr.io/laopi0169/sunroof-workbench`；构建期全量测试即质量门。
+- 根目录课程遗留 `ci.yml`（week08 northstar）加 `paths-ignore: sunroof-diagnosis/**` 避免双通道重复触发。
+- 部署文档对齐: §2 新增"方式 0: GHCR 预构建镜像"（三选一→四选一），§3 测试计数修正 76→80，新增 §11 通道说明。

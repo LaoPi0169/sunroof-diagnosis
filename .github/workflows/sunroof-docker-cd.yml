@@ -1,0 +1,60 @@
+name: sunroof-docker-cd
+
+# CD 通道: 构建镜像并发布到 GHCR
+#   - push 到 main: 产出 ghcr.io/laopi0169/sunroof-workbench:latest 与 :sha-<hash>
+#   - push 封存 tag (sunroof-*): 额外产出 :sunroof-w18-r1 这样的版本镜像
+#   - Dockerfile 构建期即跑全量测试套件 —— 质量门不过, 镜像根本产不出来
+on:
+  push:
+    branches: [main]
+    tags: ['sunroof-*']
+    paths: ['sunroof-diagnosis/**', '.github/workflows/sunroof-docker-cd.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: sunroof-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/sunroof-workbench
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and publish image (tests run inside Dockerfile)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sunroof-diagnosis
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Published
+        run: echo "published -> ${{ steps.meta.outputs.tags }}"

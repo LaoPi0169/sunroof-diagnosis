@@ -30,11 +30,15 @@ sudo usermod -aG docker $USER     # 免 sudo 跑 docker; 注销重登生效
 docker --version && docker compose version   # 验证
 ```
 
-## 2. 拿到项目代码（三选一）
+## 2. 拿到项目代码（四选一）
 
 ```bash
+# 方式 0: 直接拉 CI/CD 通道发布的预构建镜像 (最快, 无需源码; 详见 §11)
+docker pull ghcr.io/laopi0169/sunroof-workbench:latest          # main 最新
+#   或封存版本: docker pull ghcr.io/laopi0169/sunroof-workbench:sunroof-w18-r1
+
 # 方式 A: git 拉取 (推荐)
-git clone <你的仓库地址> sunroof-diagnosis
+git clone https://github.com/LaoPi0169/sunroof-diagnosis.git sunroof-diagnosis
 cd sunroof-diagnosis && git checkout sunroof-w18-r1   # 封存 tag
 
 # 方式 B: 从 Windows 开发机 scp 传 git archive 包 (与 CI STAGE-4 同口径)
@@ -51,14 +55,16 @@ scp -r user@windows-dev:d/WebstormProjects/fde-course-week-05/sunroof-diagnosis 
 > 注意：只需要 `sunroof-diagnosis/` 子目录本身。工作区根目录那套课程模板
 > （`workbench_handoff` 模板版、根目录同名 bat）**不要**一起部署。
 
-## 3. 构建镜像（构建期即跑 76 项集成测试）
+## 3. 构建镜像（构建期即跑 80 项集成测试）
 
 ```bash
 cd ~/sunroof-diagnosis
 docker build -t sunroof-workbench:latest .
 # 收尾两行应显示:
-#   Ran 76 tests in ~25s   /   OK
+#   Ran 80 tests in ~23s   /   OK
 ```
+
+> 走了方式 0（预构建镜像）的可跳过本节与 §4a 的 `--build`，直接按 §10 拉镜像运行。
 
 ## 4a. 一键启动（docker compose，推荐）
 
@@ -159,3 +165,42 @@ docker exec sunroof-workbench python -m unittest discover -s tests  # 容器内�
 容器化不改变教学沙盒定位：生成层为确定性抽取式替身（零 LLM）；工单与版本包为
 进程内模拟，唯一"外部效果"是隔离 TicketService 计数器；管理面口令请勿与真实
 系统复用。页面页脚的"诚实边界"声明与 `README.md` §实现说明同步有效。
+
+## 11. CI/CD 通道（GitHub Actions，自动化交付）
+
+远程仓库: `https://github.com/LaoPi0169/sunroof-diagnosis.git`（main 与全部 `sunroof-*` tag 已同步）。
+
+| 通道 | workflow | 触发条件 | 产物 |
+| --- | --- | --- | --- |
+| CI 门禁 | `sunroof-diagnosis-ci` | `sunroof-diagnosis/**` 的 push / PR / 封存 tag(`sunroof-*`) / 手动 | 四阶段全 PASS + 证据 artifact（Actions 页可下载归档） |
+| CD 发布 | `sunroof-docker-cd` | 同上的 push / 封存 tag | 镜像发布 GHCR: `ghcr.io/laopi0169/sunroof-workbench` |
+
+要点：
+
+- CI 与本地 `ci/run_local_ci.py` **完全同一入口**（schema / 80 用例全量测试 / 脱敏扫描 /
+  干净环境任务冒烟），本地绿 = CI 绿，证据互为对照；python 3.11 与镜像同版。
+- CD 的镜像构建期即在 Dockerfile 里跑全量测试套件 —— **质量门不过，镜像不产出**。
+- tag 约定: 打 `sunroof-*` tag（如 `sunroof-w19-r0`）→ CI + CD 自动跑 → 得到同名版本镜像。
+
+### 服务器端使用预构建镜像（方式 0 对应的运行命令）
+
+```bash
+docker pull ghcr.io/laopi0169/sunroof-workbench:latest
+docker run -d --name sunroof-workbench \
+  -p 8018:8018 \
+  -v sunroof-data:/app/data \
+  -e SUNROOF_ADMIN_TOKEN='换成你自己的强口令' \
+  --restart unless-stopped \
+  ghcr.io/laopi0169/sunroof-workbench:latest
+# 升级 = pull 新镜像 → docker rm -f sunroof-workbench → 重跑 run（数据卷 sunroof-data 保留）
+```
+
+> GHCR 包首次发布后默认 private：公开匿名拉取需在 GitHub → Packages → 该包 →
+> Package settings 改为 public；或保持 private，服务器 `docker login ghcr.io` 后拉取。
+
+### （可选）后续加全自动部署到服务器
+
+在 repo Settings → Secrets and variables → Actions 添加 `DEPLOY_HOST` / `DEPLOY_USER` /
+`DEPLOY_SSH_KEY`，然后在 `sunroof-docker-cd.yml` 的 build-publish 之后追加 SSH step 远程执行
+`docker pull ... && docker rm -f ... && docker run ...` 即为 push-to-deploy。未配置前，
+服务器升级按上一节命令人工执行（一次一条，均有据可查）。
