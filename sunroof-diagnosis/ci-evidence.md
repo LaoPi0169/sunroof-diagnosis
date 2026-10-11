@@ -136,6 +136,28 @@ behavior_drift=[] CONSISTENT；关闭开关封闭枚举 + 追加审计 + 无因�
 口令/session 零出现；真机验证首页 200 + 未登录 403）+ `start_workbench_handoff.bat`。
 合并里程碑口径与逐周差异见 `specs/mission-week-12-18.md`。
 
+### §9.1 r1 修订（2026-10-11）：工作台身份防混淆 + Docker 交付物
+
+修复"打开 8018 显示课程模板 week-018 页面"问题（根因: 工作区根目录模板版同名
+bat 同端口抢占 + 绑定失败静默退出）: `/healthz` 服务身份探针（零敏感信息）、
+`SUNROOF_BIND/SUNROOF_PORT` 环境变量驱动绑定（容器 0.0.0.0）、绑定失败明确
+`bind_failed` 提示、启动器防呆（8018 占用检测）、页面标注自研项目身份。
+同时修复测试发现缺陷: `api()` 曾夹在类中间导致 test_03-05 从未被执行（解禁后
+按第 14 周冻结核口径重写——写发起人恒为 pqe, 主管直写 = forbidden 0 效果）,
+工作台取消角色自动签发审批。新增 Docker 交付物: `Dockerfile`（构建期跑全量
+测试做质量门）/`.dockerignore`/`docker-compose.yml`/`deploy/ubuntu-docker-deploy.md`。
+
+| 阶段 | 结果 |
+| --- | --- |
+| STAGE-1-schema | PASS |
+| STAGE-2-unittest | PASS（**80 tests, OK**；75 → 80: handoff 2 → 7 真实入跑） |
+| STAGE-3-redaction | PASS（32 文件 / 51 输出点 / violations=0） |
+| STAGE-4-clean-env-smoke | PASS（4/4） |
+
+证据: `evidence/ci-run-w18-r1.log`（CI RESULT OK, duration=31.3s）。
+活体验证: healthz 身份探针 ✓ / 首页自研标识 ✓ / pqe 问答带引用 ✓ /
+supervisor 直写 forbidden 0 效果 ✓。
+
 ## 诚实边界
 
 CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称分布式 CI/容器化/制品库推送；

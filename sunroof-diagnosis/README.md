@@ -71,7 +71,8 @@ python -m generation.run_rag_evaluation            # unseal-once 只读对账: 6
 python -m mcptool.run_fixtures                     # R5+W5 夹具: 效果对账恰 1, all_pass
 python -m mcptool.run_canary                       # 金丝雀重考 60 例: behavior_drift=[] CONSISTENT
 python -m mcptool.run_degradation_drill            # D-01..04 降级演练: forbidden=0
-start_workbench_handoff.bat                        # 8018 双角色交互工作台 (最终可交互验收交付物)
+start_workbench_handoff.bat                        # 8018 双角色交互工作台 (最终可交互验收交付物; 防呆: 自动检测端口被模板占用)
+# Ubuntu 服务器 Docker 部署: 见 deploy/ubuntu-docker-deploy.md (build/compose/离线/防火墙/常见坑)
 
 python verify_node03.py                  # 节点 ③ 冒烟: 摄取/对账/重放/引擎回接, 证据落 evidence/
 python verify_node04.py                  # 节点 ④ 冒烟: 闭环/幂等/RBAC/主管结案/跨项目 denied, 证据落 evidence/

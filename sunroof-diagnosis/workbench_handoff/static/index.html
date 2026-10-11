@@ -34,6 +34,10 @@ button.bad { background:var(--bad); color:#fff; }
 <div class="wrap">
   <h1>天窗诊断 · 值守交接工作台 <span class="badge">端口 8018 · 双角色隔离</span></h1>
   <div class="bar">
+    <span class="badge ok">项目: 天窗异响诊断 (sunroof-diagnosis) · 自研工作台</span>
+    <span class="kv">非课程模板 week-018 页面 · 服务身份可用 GET /healthz 验明</span>
+  </div>
+  <div class="bar">
     <span class="kv">当前角色</span>
     <select id="role">
       <option value="pqe">一线 PQE（OEM-A，项目组内）</option>
@@ -78,7 +82,7 @@ button.bad { background:var(--bad); color:#fff; }
       <button id="btnReplay" class="sec">幂等重放</button>
     </div>
     <div id="writeOut" class="out hidden"></div>
-    <div class="note">硬门：无审批或参数不匹配 = 外部效果 0；相同幂等键最多一个外部效果；执行后由 ticket.get 独立核验。</div>
+    <div class="note">硬门：无审批或参数不匹配 = 外部效果 0；相同幂等键最多一个外部效果；执行后由 ticket.get 独立核验。写发起权限仅一线 PQE —— 主管发起会被第 14 周冻结核拒绝（forbidden，0 效果）。</div>
   </div>
   <div class="grid">
     <div class="panel">

@@ -126,17 +126,17 @@ def handle_api(method: str, path: str, body: dict, admin: bool) -> tuple:
         task_id = STATE.next_task_id()
         args = body.get("args", {})
         approvals, tickets = STATE.task_stack()
-        binding = dict(BINDING_OK)
-        binding["case_id"] = str(args.get("case_id", "")).strip().upper()
-        approval_id = approvals.issue("supervisor_li", binding) \
-            if role == "quality_supervisor" else None
+        # 审批只由管理员面板结构化签发 (双角色硬纪律: 聊天文本不构成审批,
+        # 任何角色的自动签发都会让"主管自批自写"绕过一线发起约束 ——
+        # 第 14 周冻结核: 写发起人恒为 pqe, 主管直写 = unauthorized 0 效果)。
+        approval_id = None
         trace = TaskTrace(task_id)
         trace.add("receive", {"role": role})
         trace.add("policy", {"queue": args.get("queue", "")})
         STATE.traces[task_id] = {"trace": trace, "approvals": approvals,
                                  "tickets": tickets, "args": args,
                                  "approval_id": approval_id, "role": role,
-                                 "approved": role == "quality_supervisor"}
+                                 "approved": False}
         STATE.log({"kind": "write_submit", "task_id": task_id, "role": role})
         return 200, {"task_id": task_id,
                      "state": "ready" if approval_id else "approval_required",
@@ -251,6 +251,14 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         path_only = self.path.split("?")[0]
+        if method == "GET" and path_only == "/healthz":
+            # 服务身份与健康探针 (Docker HEALTHCHECK 用; 零敏感信息零鉴权)。
+            # 用途 1: 容器编排探活; 用途 2: 浏览器打开 8018 时先验明本页是
+            # 天窗诊断自研工作台, 而非课程模板 week-018 同端口参考实现。
+            self._json(200, {"ok": True,
+                             "service": "sunroof-diagnosis-workbench",
+                             "project": "天窗异响诊断", "template": False})
+            return
         if method == "GET" and path_only in ("/", "/index.html"):
             html = build_index_html()
             self.send_response(200)
@@ -297,8 +305,23 @@ def build_index_html() -> str:
 def main() -> None:
     if not os.path.exists(CORPUS_DB):
         build_corpus()
-    server = ThreadingHTTPServer(("127.0.0.1", 8018), WorkbenchHandler)
-    print(json.dumps({"workbench": "handoff", "port": 8018,
+    bind = os.environ.get("SUNROOF_BIND", "127.0.0.1")   # 容器部署设 0.0.0.0
+    port = int(os.environ.get("SUNROOF_PORT", "8018"))
+    try:
+        server = ThreadingHTTPServer((bind, port), WorkbenchHandler)
+    except OSError as exc:
+        print(json.dumps(
+            {"fatal": "bind_failed", "bind": bind, "port": port,
+             "detail": str(exc),
+             "hint": "端口被占用: 最常见原因是课程模板 week-018 工作台 "
+                     "(工作区根目录另一套 workbench_handoff) 先启动抢了 8018。"
+                     "用 netstat -ano | findstr :8018 找 PID, "
+                     "taskkill /PID <pid> /F 结束后重跑 start_workbench_handoff.bat。"},
+            ensure_ascii=False))
+        raise SystemExit(1)
+    print(json.dumps({"workbench": "sunroof-diagnosis-handoff",
+                      "project": "天窗异响诊断 (非课程模板)",
+                      "bind": bind, "port": port,
                       "admin_env": ADMIN_TOKEN_ENV}, ensure_ascii=False))
     server.serve_forever()
 
