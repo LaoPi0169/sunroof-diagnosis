@@ -28,8 +28,8 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 扫描范围 (运行时代码) —— 节点 06 (Week 09): 13 文件 (应用 6 + CLI 1 + 部署 2 + CI 2
-#                + 语料 2 + 本扫描器)
+# 扫描范围 (运行时代码) —— 节点 07 (Week 10): 16 文件 (应用 6 + CLI 1 + 部署 2 + CI 2
+#                + 语料 2 + 评测 3 + 本扫描器)
 SCOPE_FILES = [
     os.path.join("application", "auth.py"),
     os.path.join("application", "database.py"),
@@ -44,6 +44,9 @@ SCOPE_FILES = [
     os.path.join("ci", "run_local_ci.py"),
     os.path.join("corpus", "build_corpus.py"),
     os.path.join("corpus", "check_role_candidates.py"),
+    os.path.join("evaluation", "eval_contract.py"),
+    os.path.join("evaluation", "validate_eval_set.py"),
+    os.path.join("evaluation", "run_deterministic_baseline.py"),
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

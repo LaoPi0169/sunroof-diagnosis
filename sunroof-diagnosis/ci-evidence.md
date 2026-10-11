@@ -50,6 +50,35 @@ Week 09 变化点：
   （STAGE-4 冷部署 4/4）+ 语料全新重建 8/18 五态 2/1/1/2/2 + 角色候选
   pqe 13 / quality_supervisor 18 / unknown 0 全 PASS —— 证据见 `evidence/ci-run-w09.log` 第二次追加运行。
 
+## 6. Week 10 —— 评测合同冻结（节点 ⑦，2026-10-10）
+
+CI RUN 2026-10-10 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-w10.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-004（冻结面零改动，评测件不走迁移清单） | PASS |
+| STAGE-2-unittest | 全量集成测试（薄片/摄取/任务闭环/部署发布/语料治理/**评测合同**） | PASS（**47 tests，OK = 41 + 评测 6**） |
+| STAGE-3-redaction | `ci/redaction_scan.py` 静态扫描（**16 文件** / 凭据+规格正文双规则） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门（节点 ⑤ 冻结语义不变） | PASS（**4/4**） |
+
+Week 10 变化点：
+
+- STAGE-2 全量测试 41 → 47（新增 `tests/test_eval_contract.py` 6 个评测合同用例：
+  数量矩阵逐格精确 / 输入 schema 与封存边界 / 语料引用可解析（含校验器 verdict=VALID 复核）/
+  近重复与跨 split 零泄漏 / 保留集封存件 sha256(LF) 对账冻结记录 / 确定性基线两次运行逐字节一致）；
+- STAGE-3 扫描范围 13 → 16 文件（新增 `evaluation/` 三件；评测件只输出 case_id/状态/文档标识，
+  凭据与规格正文零出现）；
+- 考卷本体：`eval-set-v1.jsonl` 60 例（36 开发 + 12 校准 + 12 保留封存），矩阵
+  24/10/8/8/10 逐格精确，归一化 query 60/60 唯一；校验器 verdict=VALID；
+- 基线探针实测（本仓库第 2 周引擎真实 ACL 语义，与参考模板 24/4 预设不同，如实记录）：
+  answered 20 / needs_review 8（SPEC_CONFLICT 4：主管跨项目可见同零件双现行版本；
+  NO_MATCHING_SPEC 4：pqe 对 OEM-B 专属件零命中）/ not_applicable 20 / sealed 12；
+  两次运行逐字节一致；5 例角色改判记录见 `specs/mission-week-10.md` §三；
+- 冻结记录 `evaluation-freeze-record-v1.md` 12 件 sha256(raw)+sha256(LF) 双口径登记，
+  测试持续把守封存件；
+- 工具链勘误（如实）：工作区根存在同名参考仓库，PowerShell .NET API 相对路径曾把哈希
+  量到根仓库文件 —— 冻结哈希一律以 Python cwd 口径重算并复测（哈希振荡假象由此而来）。
+
 ## 诚实边界
 
 CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称分布式 CI/容器化/制品库推送；
