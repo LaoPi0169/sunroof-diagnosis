@@ -1,0 +1,516 @@
+{
+  "corpus_snapshot": "sunroof-corpus-w09-v1",
+  "batch_id": "corpus-batch-w09-v1",
+  "parser": {
+    "parser_id": "markdown-section-parser-v1",
+    "chunker_id": "fixed-heading-chunker-v1",
+    "chunker_params": {
+      "heading_level": 2,
+      "acl_inheritance": "chunk-strictest"
+    }
+  },
+  "routing_states": [
+    "accepted",
+    "accepted_restricted",
+    "expired",
+    "conflict_review",
+    "quarantined"
+  ],
+  "acl_model": {
+    "pushdown": "filter-then-candidate: 权限谓词下推到 SQL WHERE, 先过滤后候选",
+    "mixed_chunk_rule": "混合权限段取最严格权限 (段标题或正文含「仅限质量主管」标记 -> 仅 quality_supervisor), 不降权; 标题+正文双扫描",
+    "leak_policy": "任何主管专属 chunk 出现在 pqe 原始候选集 = 本周失败"
+  },
+  "counts": {
+    "documents_total": 8,
+    "chunks_total": 18,
+    "by_status": {
+      "accepted": 2,
+      "accepted_restricted": 1,
+      "expired": 1,
+      "conflict_review": 2,
+      "quarantined": 2
+    },
+    "chunks_by_classification": {
+      "internal-general": 13,
+      "internal-restricted": 5
+    }
+  },
+  "documents": [
+    {
+      "document_id": "service-general-v1",
+      "file_path": "corpus\\sources\\service-general-v1.md",
+      "title": "售后服务总则 v1（已废止）",
+      "lineage_key": "service-general",
+      "source_version": "v1.0",
+      "source_owner": "售后工程组·孙敏",
+      "effective_at": "2025-01-01",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "expired",
+      "missing_fields": [],
+      "route_reason": "谱系键 service-general 被其他来源取代 (service-general-v3), 按 supersedes 谱系判定过期, 与文件时间戳无关",
+      "content_sha256": "1be50f088f52e39ec9bcd029defa7ed5095a5f6c233c781fbe577c5d433481f9",
+      "content_bytes": 934,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "service-general-v3",
+      "file_path": "corpus\\sources\\service-general-v3.md",
+      "title": "售后服务总则 v3（对工单解释基准）",
+      "lineage_key": "service-general",
+      "source_version": "v3.2",
+      "source_owner": "售后工程组·孙敏",
+      "effective_at": "2026-01-01",
+      "expires_at": null,
+      "supersedes": [
+        "service-general"
+      ],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "missing_fields": [],
+      "route_reason": "要件齐备且为普通分类 (pqe 与 quality_supervisor 可见)",
+      "content_sha256": "670ca2339306a7bb0f0a51ede853b7b9ef487e66b65dffdfb4250a4ef4a9a12d",
+      "content_bytes": 2385,
+      "chunk_count": 8,
+      "chunk_ids": [
+        "service-general-v3#s00",
+        "service-general-v3#s01",
+        "service-general-v3#s02",
+        "service-general-v3#s03",
+        "service-general-v3#s04",
+        "service-general-v3#s05",
+        "service-general-v3#s06",
+        "service-general-v3#s07"
+      ]
+    },
+    {
+      "document_id": "torque-east-v5",
+      "file_path": "corpus\\sources\\torque-east-v5.md",
+      "title": "东区扭矩复紧细则 v5",
+      "lineage_key": "torque-east",
+      "source_version": "v5.0",
+      "source_owner": "扭矩标准组·周毅",
+      "effective_at": "2026-03-01",
+      "expires_at": null,
+      "supersedes": [
+        "torque-east"
+      ],
+      "conflict_group": null,
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "missing_fields": [],
+      "route_reason": "要件齐备且为普通分类 (pqe 与 quality_supervisor 可见)",
+      "content_sha256": "e881e3f28f206e89a9fb6a6fbe903b9b9da5be52ba7a713cd17e3fb873c79e3a",
+      "content_bytes": 1674,
+      "chunk_count": 6,
+      "chunk_ids": [
+        "torque-east-v5#s00",
+        "torque-east-v5#s01",
+        "torque-east-v5#s02",
+        "torque-east-v5#s03",
+        "torque-east-v5#s04",
+        "torque-east-v5#s05"
+      ]
+    },
+    {
+      "document_id": "claim-supervisor-v2",
+      "file_path": "corpus\\sources\\claim-supervisor-v2.md",
+      "title": "索赔执行细则 v2（质量主管专属）",
+      "lineage_key": "claim-supervisor",
+      "source_version": "v2.0",
+      "source_owner": "索赔流程组·吴桐",
+      "effective_at": "2026-02-01",
+      "expires_at": null,
+      "supersedes": [
+        "claim-supervisor"
+      ],
+      "conflict_group": null,
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted_restricted",
+      "missing_fields": [],
+      "route_reason": "要件齐备且为主管专属分类 (仅 quality_supervisor 可见)",
+      "content_sha256": "08076321561718d11df6cd38ba01d8fad3bcab5a9fbf5795fcf35167362659ec",
+      "content_bytes": 1067,
+      "chunk_count": 4,
+      "chunk_ids": [
+        "claim-supervisor-v2#s00",
+        "claim-supervisor-v2#s01",
+        "claim-supervisor-v2#s02",
+        "claim-supervisor-v2#s03"
+      ]
+    },
+    {
+      "document_id": "retrofit-bulletin-v2",
+      "file_path": "corpus\\sources\\retrofit-bulletin-v2.md",
+      "title": "OEM-A 改装通告 v2（2026-04 批次天窗复位）",
+      "lineage_key": "retrofit-bulletin",
+      "source_version": "v2.0",
+      "source_owner": "改装工程组·韩磊",
+      "effective_at": "2026-04-10",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": "retrofit-oem-a-2026-04",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "conflict_review",
+      "missing_fields": [],
+      "route_reason": "冲突组 retrofit-oem-a-2026-04 存在第二份现行来源; 冻结在候选池外, 待知识所有者裁决",
+      "content_sha256": "e7233ef823ed1cebef965a6fd9a49d19ef07f1716d88a79be715e0b885093516",
+      "content_bytes": 731,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "retrofit-notice-v4",
+      "file_path": "corpus\\sources\\retrofit-notice-v4.md",
+      "title": "OEM-A 改装公告 v4（2026-04 批次天窗复位）",
+      "lineage_key": "retrofit-notice",
+      "source_version": "v4.0",
+      "source_owner": "改装工程组·韩磊",
+      "effective_at": "2026-04-15",
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": "retrofit-oem-a-2026-04",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "conflict_review",
+      "missing_fields": [],
+      "route_reason": "冲突组 retrofit-oem-a-2026-04 存在第二份现行来源; 冻结在候选池外, 待知识所有者裁决",
+      "content_sha256": "43933eaecc8d6963cde913431895438ae097dadc04dd5d5aaaf53c75b86cd9ce",
+      "content_bytes": 690,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "quick-note",
+      "file_path": "corpus\\sources\\quick-note.txt",
+      "title": "口头记录（无合同元数据）",
+      "lineage_key": null,
+      "source_version": null,
+      "source_owner": null,
+      "effective_at": null,
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": null,
+      "allowed_roles": [],
+      "status": "quarantined",
+      "missing_fields": [
+        "source_owner",
+        "source_version",
+        "effective_at",
+        "allowed_roles"
+      ],
+      "route_reason": "缺治理要件, 默认隔离 (quarantine-by-default): source_owner, source_version, effective_at, allowed_roles",
+      "content_sha256": "48bfcab2112e0af5ebf054f434265d747a37e952643e024289b93da4d7087c18",
+      "content_bytes": 173,
+      "chunk_count": 0,
+      "chunk_ids": []
+    },
+    {
+      "document_id": "special-claim-copy",
+      "file_path": "corpus\\sources\\special-claim-copy.md",
+      "title": "特殊索赔政策（复制件）",
+      "lineage_key": null,
+      "source_version": null,
+      "source_owner": null,
+      "effective_at": null,
+      "expires_at": null,
+      "supersedes": [],
+      "conflict_group": null,
+      "classification": null,
+      "allowed_roles": [],
+      "status": "quarantined",
+      "missing_fields": [
+        "source_owner",
+        "source_version",
+        "effective_at",
+        "allowed_roles"
+      ],
+      "route_reason": "缺治理要件, 默认隔离 (quarantine-by-default): source_owner, source_version, effective_at, allowed_roles",
+      "content_sha256": "45476ac19fa9b04d01235efca6932b5e21f52836672cc8693fa0c91cefa4e354",
+      "content_bytes": 479,
+      "chunk_count": 0,
+      "chunk_ids": []
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "service-general-v3#s00",
+      "document_id": "service-general-v3",
+      "seq": 0,
+      "heading": "(导言)",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "53552cd5cfd0753bdf77c8715cea01eb96a4f98b589a8ff608ca48c0fd1995f0",
+      "body_chars": 118
+    },
+    {
+      "chunk_id": "service-general-v3#s01",
+      "document_id": "service-general-v3",
+      "seq": 1,
+      "heading": "适用范围与生效说明",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "b233d10bb59faa9ef43874290447f0e770e441d7fe678626338d02e45dca18f6",
+      "body_chars": 105
+    },
+    {
+      "chunk_id": "service-general-v3#s02",
+      "document_id": "service-general-v3",
+      "seq": 2,
+      "heading": "天窗异响的首次响应口径",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "2d63888b97754ecc3eda4356037be5e665475ff2c95ec9779d900c331fb0bdd5",
+      "body_chars": 118
+    },
+    {
+      "chunk_id": "service-general-v3#s03",
+      "document_id": "service-general-v3",
+      "seq": 3,
+      "heading": "排水系统堵塞的通用处置",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "4b3b94272fa43da16ec1448cbfe7dc7c1a4101e06bd14b1c99cd841059908931",
+      "body_chars": 97
+    },
+    {
+      "chunk_id": "service-general-v3#s04",
+      "document_id": "service-general-v3",
+      "seq": 4,
+      "heading": "电机复紧与玻璃对齐的工时口径",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "aace8673850a22a9a776892335cc763ac125f5064c36f1a665f30c24dc2c0a1f",
+      "body_chars": 100
+    },
+    {
+      "chunk_id": "service-general-v3#s05",
+      "document_id": "service-general-v3",
+      "seq": 5,
+      "heading": "保修期与工单凭证",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "c4c425b84ce400deee364a9bc4ea722a4697f4635557ded3385100e87c66169e",
+      "body_chars": 85
+    },
+    {
+      "chunk_id": "service-general-v3#s06",
+      "document_id": "service-general-v3",
+      "seq": 6,
+      "heading": "质量主管例外条款（仅限质量主管处理）",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "70c46a9c8eda966e8977b00c566635c604186b09d99e39950536cf1fb0628e2c",
+      "body_chars": 126
+    },
+    {
+      "chunk_id": "service-general-v3#s07",
+      "document_id": "service-general-v3",
+      "seq": 7,
+      "heading": "升级路径与工单流转",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "879058148a760eee807abf4ef7769c354ea2bf709e60a3eb53de8170dfb3ad1c",
+      "body_chars": 93
+    },
+    {
+      "chunk_id": "torque-east-v5#s00",
+      "document_id": "torque-east-v5",
+      "seq": 0,
+      "heading": "(导言)",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "f1bf4fd5c491f612ef01754f4372e3ee44342c115607cd2bd45daa192045a919",
+      "body_chars": 102
+    },
+    {
+      "chunk_id": "torque-east-v5#s01",
+      "document_id": "torque-east-v5",
+      "seq": 1,
+      "heading": "适用范围与生效说明",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "11445b189be5bb4771975cd0ce886e403d80817a76ec89f864fb87d1ba5fcefa",
+      "body_chars": 79
+    },
+    {
+      "chunk_id": "torque-east-v5#s02",
+      "document_id": "torque-east-v5",
+      "seq": 2,
+      "heading": "复紧作业的触发条件",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "020994a58cefd9ddb0705b226356b9d4fa5788ce832735c1821971bf1e76b5d8",
+      "body_chars": 90
+    },
+    {
+      "chunk_id": "torque-east-v5#s03",
+      "document_id": "torque-east-v5",
+      "seq": 3,
+      "heading": "复紧顺序与工时口径",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "a411f887b00e1e8cf8a8051411f2c05bd53a3dcc262e3e0f51db28ab81ae75c7",
+      "body_chars": 81
+    },
+    {
+      "chunk_id": "torque-east-v5#s04",
+      "document_id": "torque-east-v5",
+      "seq": 4,
+      "heading": "复紧后的验证、工具与记录",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "9c84b763a3127dd7ae1e11b962359b30ad3729ad5f1551348a2156d595bab3d6",
+      "body_chars": 148
+    },
+    {
+      "chunk_id": "torque-east-v5#s05",
+      "document_id": "torque-east-v5",
+      "seq": 5,
+      "heading": "与检验标准的衔接",
+      "classification": "internal-general",
+      "allowed_roles": [
+        "pqe",
+        "quality_supervisor"
+      ],
+      "status": "accepted",
+      "text_sha256": "2ec50ab16278a4e8885f5c42898732afc0a0e7806e81bfbf8831affc585b6ab8",
+      "body_chars": 90
+    },
+    {
+      "chunk_id": "claim-supervisor-v2#s00",
+      "document_id": "claim-supervisor-v2",
+      "seq": 0,
+      "heading": "(导言)",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted_restricted",
+      "text_sha256": "44e21e5d88d9b35633e9116d6bee69c2a307479e075f2e2bcb2531f59ddc0529",
+      "body_chars": 106
+    },
+    {
+      "chunk_id": "claim-supervisor-v2#s01",
+      "document_id": "claim-supervisor-v2",
+      "seq": 1,
+      "heading": "索赔审批线",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted_restricted",
+      "text_sha256": "da7ec9b46b18c47df62697a35c3c11631cf5c18e1f105049b58d44c79d170a1a",
+      "body_chars": 90
+    },
+    {
+      "chunk_id": "claim-supervisor-v2#s02",
+      "document_id": "claim-supervisor-v2",
+      "seq": 2,
+      "heading": "特殊情形的索赔执行",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted_restricted",
+      "text_sha256": "94c8e2ae6eed08f845372dfca2ffa281a4a000d8c6eb97de3773042ef668c44d",
+      "body_chars": 88
+    },
+    {
+      "chunk_id": "claim-supervisor-v2#s03",
+      "document_id": "claim-supervisor-v2",
+      "seq": 3,
+      "heading": "索赔凭证的核验要求",
+      "classification": "internal-restricted",
+      "allowed_roles": [
+        "quality_supervisor"
+      ],
+      "status": "accepted_restricted",
+      "text_sha256": "8fbfb1b45e455ac203f7437f26577c3521c0e4f99c583637b64527bded918416",
+      "body_chars": 90
+    }
+  ],
+  "determinism": {
+    "no_wall_clock": "清单不含摄取墙钟时间, 血缘以 batch_id 为锚",
+    "rebuild_check": "两次构建 (不同临时库) 的 documents/chunks 全字段逐条一致"
+  }
+}

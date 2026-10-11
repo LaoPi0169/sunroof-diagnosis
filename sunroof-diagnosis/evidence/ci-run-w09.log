@@ -1,0 +1,20 @@
+CI RUN 2026-10-11T02:21:38+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 41 tests in 6.059s, exit=0
+Ran 41 tests in 6.059s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=13; emissions_checked=42; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-od1qejq8; port=51256; smokes_passed=4/4
+CI RESULT OK | duration=10.4s | 2026-10-11T02:21:48+00:00 (UTC)
+
+CI RUN 2026-10-11T02:24:03+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 41 tests in 5.765s, exit=0
+Ran 41 tests in 5.765s
+
+OK
+[PASS] STAGE-3-redaction :: scanned_files=13; emissions_checked=42; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-itgnzxbr; port=57966; smokes_passed=4/4
+CI RESULT OK | duration=8.0s | 2026-10-11T02:24:11+00:00 (UTC)
+
