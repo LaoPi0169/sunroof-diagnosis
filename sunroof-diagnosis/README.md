@@ -1,7 +1,7 @@
 # 天窗总成只读诊断（Sunroof Read-Only Diagnosis）· 阶段 A + 阶段 B 进展
 按《FDE 成长路线图》(`../fde-roadmap-v1.md`) 对「PQE 跨 MES/QMS/PLM 只读调取与对账」业务场景逐步展开的本项目自包含子仓库。**阶段目标：一键跨系统对账 + ACL 隔离跨主机厂敏感图纸 + 缺失/冲突/过期明确拒答 + 带引用的根因分析报告草稿。**
 
-## 当前状态（阶段 A 节点 ①–⑤ 已完成并封存；阶段 B 节点 ⑥ 已完成）
+## 当前状态（阶段 A 节点 ①–⑤ 已完成并封存；阶段 B 节点 ⑥⑦ 已完成）
 | 节点 | 交付物 | 状态 |
 |---|---|---|
 | ① 问题合同与发现 | `specs/business-background.md` / `specs/role-and-permission-matrix.md` / `specs/discovery-brief-v1.md`（含获准记录与模拟标注） | ✅ |
@@ -10,7 +10,8 @@
 | ④ 双角色任务闭环 | `task-state-model.md` + `adr-003-task-permission-adaptations.md` + `decision-memo-02.md` + 迁移 003 + `application/tasks.py` + `/api/v1/tasks/action`·`/api/v1/tasks` 端点 + `workbench_cli.py` + `verify_node04.py` + **9/9 任务闭环测试全绿（26/26 总）** | ✅ |
 | ⑤ 部署与回滚 | `release-manifest-v1.json` + `deploy-README.md` + `ROLLBACK.md` + 迁移 004（policy_config）+ `deploy/apply_policy_config.py`（配置收敛器）+ `deploy/smoke_w08.py`（4 条任务级冒烟门）+ `deploy/run_rollback_drill.py` + `ci/run_local_ci.py`（四阶段）+ `ci/redaction_scan.py` + 7 份 W8 文档 + `adr-004` + **9/9 部署发布测试全绿（35/35 总）** | ✅（阶段 A 封存） |
 | ⑥ 语料治理（阶段 B · 第 9 周） | `option-note-v1.md` + `knowledge-owner-acl-matrix-v1.md` + `corpus/`（schema/构建器/角色候选核查器）+ `corpus/sources/` 8 份合成材料 + `corpus-manifest-v1.json`（sha256 绑定）+ `ingestion-isolation-report-v1.md` + `role-candidate-check-v1.md` + `corpus-card-v1.md` + `source-review-note-v1.md` + **6/6 语料治理测试全绿（41/41 总）** | ✅ |
-| 阶段 B（剩余） | 评测合同冻结 / 检索基线 / 只读 RAG 评测 / 只读 MCP / 报告生成 | ⬜ 后续 |
+| ⑦ 评测合同冻结（阶段 B · 第 10 周） | `eval-plan-v1.md` + `eval-set-v1.jsonl`（60 例 = 36 开发 + 12 校准 + 12 保留封存）+ `eval-holdout-labels-sealed-v1.json` + `labeling-guide-v1.md`（48 例公开标签附录）+ `dataset-card-v1.md` + `split-leakage-check-v1.md` + `deterministic-baseline-results-v1.jsonl` + `evaluation/`（合同常量/校验器/确定性基线探针）+ `evaluation-freeze-record-v1.md`（12 件 sha256 双口径）+ `specs/mission-week-10.md` + **6/6 评测合同测试全绿（47/47 总）** | ✅ |
+| 阶段 B（剩余） | 检索基线比较 / 只读 RAG 评测 / 只读 MCP / 受控写审批 | ⬜ 后续 |
 
 ## 架构（阶段 A 节点 ②③④⑤ 落地部分）
 ```
@@ -42,7 +43,7 @@
      2. 引擎硬限读配置 (缺失/非法回退默认 15.0, known-good 下行为逐字节等价)
      3. 任务级冒烟门 deploy/smoke_w08.py 4 条三向对账: /health 200 ≠ 业务正确, 4/4 才放量
      4. CI 四阶段 ci/run_local_ci.py (= .github/workflows/sunroof-ci.yml 同一入口):
-        STAGE-1 Schema -> STAGE-2 41 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
+        STAGE-1 Schema -> STAGE-2 47 用例 -> STAGE-3 脱敏扫描 -> STAGE-4 git archive 冷部署 + 冒烟
      5. 回滚 = 配置收敛式 (重放 known-good, ROLLBACK.md 场景 A-E); 演练 runner 三段闭环落证据
 
 [语料层 (节点 06, 阶段 B)] corpus/build_corpus.py (零模型调用; 语料 schema 独立, 冻结迁移 001-004 零改动)
@@ -60,7 +61,7 @@
 ```bash
 pip install -r requirements.txt          # 或复用上级仓库 .venv
 uvicorn application.main:app --port 8020 # 勿与原仓库 8016-8018 冲突
-python -m unittest discover -s tests -v  # 41 个集成测试 (独立临时库, 100% 确定; 含语料治理 6 用例)
+python -m unittest discover -s tests -v  # 47 个集成测试 (独立临时库, 100% 确定; 含语料治理 6 + 评测合同 6 用例)
 python verify_node03.py                  # 节点 ③ 冒烟: 摄取/对账/重放/引擎回接, 证据落 evidence/
 python verify_node04.py                  # 节点 ④ 冒烟: 闭环/幂等/RBAC/主管结案/跨项目 denied, 证据落 evidence/
 python workbench_cli.py                  # 双角色任务工作台 CLI (需先启动 API; Token 登录 -> 队列 -> 三要素核验 -> 动作)
@@ -79,6 +80,13 @@ python corpus/check_role_candidates.py --db data\corpus-w09.db
                                          # 角色候选核查 (ACL 下推): pqe 13 / quality_supervisor 18 / 未知 0, 泄漏即退出码 1
 python ci/run_local_ci.py --evidence-file evidence/ci-run-w09.log
                                          # Week 09 复跑 CI 四阶段 (STAGE-2 41 用例, 语料治理 6 用例并入)
+
+# —— 节点 ⑦ 评测合同冻结 (阶段 B · 第 10 周 · 零模型调用) ——
+python evaluation/validate_eval_set.py   # 考卷校验: 60 行矩阵逐格 + 近重复零泄漏 + 封存边界零标签 -> VALID
+python evaluation/run_deterministic_baseline.py
+                                         # 确定性基线探针: 60 例两次运行逐字节一致 (answered 20/needs_review 8/not_applicable 20/sealed 12)
+python ci/run_local_ci.py --evidence-file evidence/ci-run-w10.log
+                                         # Week 10 复跑 CI 四阶段 (STAGE-2 47 用例, 评测合同 6 用例并入)
 ```
 可信身份 Token（教学模拟）：`token_pqe_oem_a` / `token_pqe_oem_b` / `token_qa_supervisor_secret`（跨项目只读）；缺失 Token = 默认 PQE 培训身份；未知 Token = 401。
 
@@ -96,6 +104,7 @@ python ci/run_local_ci.py --evidence-file evidence/ci-run-w09.log
 5. 越权动作零效果 + 幂等：RBAC 一票否决 + 任务级 ACL（跨项目直调 `denied` 零回显），`denied` 仅审计不改变任务状态；重复提交 `ALREADY_APPLIED` 不产生第二次业务效果（任务用例 1/3/4/8）；
 6. 部署面三门（节点 ⑤，测试已证明）：清单三类绑定且零秘密（用例 1）；收敛器白名单 Default-Deny + 零业务写副作用 + 零 DDL（用例 2/3）；配置漂移必须被任务级冒烟拦截，配置收敛式回滚恢复且全程零删库（用例 6/7 + 回滚演练 R0/R1/R2 真实运行）。
 7. 语料面三门（节点 ⑥，测试已证明）：缺任一治理要件默认隔离，隔离/过期/冲突件正文 chunk 恒为 0（用例 2/3/4）；ACL 下推先过滤后候选，主管专属 chunk 在 pqe 原始候选零出现且候选集合与 ACL 矩阵精确一致（含 `service-general-v3#s06` 排除，用例 5）；清单 sha256 绑定 8 份来源且两次构建逐字节一致（用例 1/6）。
+8. 评测面三门（节点 ⑦，测试已证明）：60 例数量矩阵逐格精确（36/12/12 × 24/10/8/8/10）且输入行零标签字段（封存边界，用例 1/2/4）；gold/forbidden 引用全部回到第 9 周冻结快照且校验器 verdict=VALID（用例 3）；保留集标签只存封存件且 sha256(LF) 与冻结记录一致、确定性基线两次运行逐字节一致并逐例携带精确 release（用例 5/6）。
 
 ## 诚实边界
-MES/QMS/PLM 为 SQLite 合成夹具模拟；零大模型；SN 自动抓取（只读 MCP）留待阶段 C；`abstained` 终态后续扩展不改既有语义；Token 为教学模拟鉴权，上线前需按真实 SSO 重审权限矩阵。批次 `completed` 不等于数据质量完美、不等于用户已采用、不等于产生商业 ROI；`completed_with_quarantine` 是正常运营状态；摄取为服务层能力，未新增 HTTP 面（与原仓库 Week 06 惯例一致）。任务状态机为单库单事务、串行请求设计，无行锁（幂等键是第一道防线，生产化需乐观锁，见 `decision-memo-02.md` 生产化差距清单）；`confirmed`/`refused` 为终态、无重开转移；质量主管结案仅代表本系统内复核闭环，原系统人工流程双轨并行；CLI 工作台为薄壳，安全全部在服务端。部署面（节点 ⑤）：回滚对象是**配置数据**而非代码，DDL 迁移只增不做降级（`ROLLBACK.md` 场景 B）；单机沙盒演练不宣称生产就绪、热回滚或多实例编排；`/health` 200 只代表进程存活，放量只认任务级冒烟 4/4；任务夹具为一次性状态机终态，冒烟复验必须用全新初始化的数据版本；收敛器不判对错（对错靠评审 + 冒烟双防线，引擎对非法配置值防御性回退默认）。语料面（节点 ⑥）：五态路由与候选检查只证明「语料可被治理、权限可下推」，不证明检索质量与相关性；语料 ACL 是角色级（pqe/quality_supervisor），未下推到 OEM 项目组维度；8 份来源全为教学合成（synthetic=true），冲突对在所有者裁决前不作为任何答案依据；「语料可构建」不外推「RAG 改善任务」（后者归第 10–12 周冻结评测）。
+MES/QMS/PLM 为 SQLite 合成夹具模拟；零大模型；SN 自动抓取（只读 MCP）留待阶段 C；`abstained` 终态后续扩展不改既有语义；Token 为教学模拟鉴权，上线前需按真实 SSO 重审权限矩阵。批次 `completed` 不等于数据质量完美、不等于用户已采用、不等于产生商业 ROI；`completed_with_quarantine` 是正常运营状态；摄取为服务层能力，未新增 HTTP 面（与原仓库 Week 06 惯例一致）。任务状态机为单库单事务、串行请求设计，无行锁（幂等键是第一道防线，生产化需乐观锁，见 `decision-memo-02.md` 生产化差距清单）；`confirmed`/`refused` 为终态、无重开转移；质量主管结案仅代表本系统内复核闭环，原系统人工流程双轨并行；CLI 工作台为薄壳，安全全部在服务端。部署面（节点 ⑤）：回滚对象是**配置数据**而非代码，DDL 迁移只增不做降级（`ROLLBACK.md` 场景 B）；单机沙盒演练不宣称生产就绪、热回滚或多实例编排；`/health` 200 只代表进程存活，放量只认任务级冒烟 4/4；任务夹具为一次性状态机终态，冒烟复验必须用全新初始化的数据版本；收敛器不判对错（对错靠评审 + 冒烟双防线，引擎对非法配置值防御性回退默认）。语料面（节点 ⑥）：五态路由与候选检查只证明「语料可被治理、权限可下推」，不证明检索质量与相关性；语料 ACL 是角色级（pqe/quality_supervisor），未下推到 OEM 项目组维度；8 份来源全为教学合成（synthetic=true），冲突对在所有者裁决前不作为任何答案依据；「语料可构建」不外推「RAG 改善任务」（后者归第 10–12 周冻结评测）。评测面（节点 ⑦）：本周只证明「评测合同与 60 条案例已在看候选结果之前冻结，且确定性基线已逐例跑通」，不宣称检索质量与答案质量；基线分布为本仓库第 2 周引擎真实 ACL 语义的实测（主管跨项目可见同零件双现行版本 → SPEC_CONFLICT），未回调引擎、未删难题；60 例均含显式角色（无 unknown_role 案例）；材料全为教学合成；保留集为自我封存 ≠ 独立盲测；课程数量与阈值不构成行业标准、客户承诺或生产门槛。

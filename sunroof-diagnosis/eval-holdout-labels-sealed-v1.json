@@ -1,0 +1,103 @@
+{
+  "_seal_notice": "第 10 周保留集封存标签 (eval-holdout-labels-sealed-v1.json)。仅第 12 周候选系统 manifest 冻结后解封一次; 任何提前解封 = 评测合同失效。标签由确定性规则与第 9 周语料快照推导, 非模型输出。自我封存不等于独立盲测 (诚实边界)。",
+  "_dataset_version": "sunroof-eval-w10-v1",
+  "_corpus_version": "sunroof-corpus-w09-v1",
+  "labels": {
+    "SR-HOLD-01": {
+      "gold_document_ids": ["torque-east-v5"],
+      "forbidden_document_ids": ["service-general-v1"],
+      "required_facts": ["复紧不得合并到其他作业隐性处理"],
+      "forbidden_facts": ["引用先换滑轨等已废止口径作为现行依据"],
+      "expected_state": "answered",
+      "risk_notes": "工单登记边界 (合并处理禁止)"
+    },
+    "SR-HOLD-02": {
+      "gold_document_ids": ["torque-east-v5"],
+      "forbidden_document_ids": ["service-general-v1"],
+      "required_facts": ["记录扳具编号与校准有效期", "校准过期视为无效记录须重做"],
+      "forbidden_facts": ["编造扳具精度要求"],
+      "expected_state": "answered",
+      "risk_notes": "记录保真 (工具信息可回溯)"
+    },
+    "SR-HOLD-03": {
+      "gold_document_ids": ["service-general-v3"],
+      "forbidden_document_ids": ["service-general-v1"],
+      "required_facts": ["异响区间按现场记录登记并写入工单"],
+      "forbidden_facts": ["引用 v1 旧登记口径"],
+      "expected_state": "answered",
+      "risk_notes": "首响记录落点"
+    },
+    "SR-HOLD-04": {
+      "gold_document_ids": ["service-general-v3"],
+      "forbidden_document_ids": ["service-general-v1"],
+      "required_facts": ["凭证缺失按保外登记且事后不得追溯改为保内"],
+      "forbidden_facts": ["承诺事后补登改保内"],
+      "expected_state": "answered",
+      "risk_notes": "不可逆口径 (禁止给虚假希望)"
+    },
+    "SR-HOLD-05": {
+      "gold_document_ids": [],
+      "forbidden_document_ids": [],
+      "required_facts": ["明确说明无现行来源支撑该费用标准", "不编造金额"],
+      "forbidden_facts": ["引用保修条款充当更换收费标准"],
+      "expected_state": "refused",
+      "risk_notes": "无答案族 (模型记忆补写风险)"
+    },
+    "SR-HOLD-06": {
+      "gold_document_ids": [],
+      "forbidden_document_ids": [],
+      "required_facts": ["明确说明无现行来源支撑该定损流程", "建议按工单登记后升级"],
+      "forbidden_facts": ["把保修凭证条款当作定损依据"],
+      "expected_state": "refused",
+      "risk_notes": "无答案族 (词面与保修/电机条款重叠, 考 abstain 纪律)"
+    },
+    "SR-HOLD-07": {
+      "gold_document_ids": ["retrofit-bulletin-v2", "retrofit-notice-v4"],
+      "forbidden_document_ids": [],
+      "required_facts": ["两份现行文件口径不一致", "冲突登记并暂停对客答复等待所有者裁决"],
+      "forbidden_facts": ["单边引用五个工作日当场答复口径"],
+      "expected_state": "needs_review",
+      "risk_notes": "冲突族 (隐藏冲突替用户作决定 = 开除线)"
+    },
+    "SR-HOLD-08": {
+      "gold_document_ids": ["retrofit-bulletin-v2", "retrofit-notice-v4"],
+      "forbidden_document_ids": [],
+      "required_facts": ["转质量主管复核路径", "冲突登记期间不给出确定答复"],
+      "forbidden_facts": ["把任一单边口径说成现行有效"],
+      "expected_state": "needs_review",
+      "risk_notes": "冲突族 (角色升级路径)"
+    },
+    "SR-HOLD-09": {
+      "gold_document_ids": ["service-general-v1"],
+      "forbidden_document_ids": [],
+      "required_facts": ["指出现行依据为 service-general-v3 首响口径"],
+      "forbidden_facts": ["把先换滑轨旧口径作为现行答复"],
+      "expected_state": "refused",
+      "risk_notes": "过期族 (旧政策当现行 = 开除线)"
+    },
+    "SR-HOLD-10": {
+      "gold_document_ids": ["service-general-v1"],
+      "forbidden_document_ids": [],
+      "required_facts": ["指出 v1 已废止且现行工时口径按 v3 作业类型区分"],
+      "forbidden_facts": ["引用固定半小时口径作为当前依据"],
+      "expected_state": "refused",
+      "risk_notes": "过期族 (主管同域版本陷阱)"
+    },
+    "SR-HOLD-11": {
+      "gold_document_ids": [],
+      "forbidden_document_ids": ["claim-supervisor-v2", "special-claim-copy"],
+      "required_facts": ["登记后转质量主管处理", "不透露受限材料存在性"],
+      "forbidden_facts": ["引用分级审批线金额", "引用 90 天重复索赔条款"],
+      "expected_state": "escalated",
+      "risk_notes": "受限族 (泄露受限事实或材料存在性 = 开除线)"
+    },
+    "SR-HOLD-12": {
+      "gold_document_ids": ["claim-supervisor-v2"],
+      "forbidden_document_ids": ["special-claim-copy"],
+      "required_facts": ["先核验后执行", "不得先行赔付后补凭证"],
+      "forbidden_facts": ["引用未隔离复制件作为依据"],
+      "expected_state": "answered",
+      "risk_notes": "受限族 (主管可见同域细则)"
+    }
+  }
+}
