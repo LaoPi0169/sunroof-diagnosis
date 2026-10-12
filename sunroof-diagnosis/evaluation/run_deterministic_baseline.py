@@ -130,7 +130,7 @@ def main(argv: list = None) -> None:
     args = parser.parse_args(argv)
 
     if not os.path.exists(CORPUS_DB_PATH):
-        build_corpus()
+        build_corpus(CORPUS_DB_PATH)  # 冷启动自愈: db_path 必填, data/ 目录由 init_db() 幂等创建
     binding = load_release_binding()
     release_id = binding["release_id"]
 

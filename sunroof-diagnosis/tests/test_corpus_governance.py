@@ -36,6 +36,17 @@ EXPECTED_PQE_CANDIDATES = (
 )
 
 
+def _canon_documents(documents: list) -> list:
+    """file_path 分隔符归一化 (平台一致性边界): 冻结清单按 Windows 作者机的
+    os.sep 生成 (反斜杠), Linux 重建为正斜杠。分隔符属平台产物, 不参与内容
+    绑定语义 —— 内容锚 (document_id/title/来源 sha256/状态族) 仍逐字段精确
+    比对; 冻结的 corpus-manifest-v1.json 本身零改动。"""
+    return [
+        {**doc, "file_path": doc["file_path"].replace("\\", "/")}
+        for doc in documents
+    ]
+
+
 class CorpusGovernanceTests(unittest.TestCase):
     """语料快照的确定性 / 默认隔离 / 权限下推三道治理硬门。"""
 
@@ -141,8 +152,13 @@ class CorpusGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(committed["corpus_snapshot"], SNAPSHOT)
         self.assertEqual(committed["batch_id"], "corpus-batch-w09-v1")
-        self.assertEqual(committed["documents"], fresh["documents"])
-        self.assertEqual(committed["chunks"], fresh["chunks"])
+        self.assertEqual(
+            _canon_documents(committed["documents"]),
+            _canon_documents(fresh["documents"]),
+            "提交清单与全新重建漂移 (documents; file_path 仅分隔符口径差异)",
+        )
+        self.assertEqual(committed["chunks"], fresh["chunks"],
+                         "提交清单与全新重建漂移 (chunks)")
         self.assertEqual(committed["counts"]["documents_total"], 8)
         self.assertEqual(committed["counts"]["chunks_total"], 18)
         self.assertEqual(

@@ -33,7 +33,11 @@ def run_canary(out_path: str = None) -> dict:
     frozen = {row["case_id"]: row for row in
               (json.loads(line) for line in open(RESULTS_PATH, encoding="utf-8")
                if line.strip())}
-    conn = sqlite3.connect(os.path.join(PROJECT_ROOT, "data", "corpus-w09.db"))
+    corpus_db = os.path.join(PROJECT_ROOT, "data", "corpus-w09.db")
+    if not os.path.exists(corpus_db):
+        from corpus.build_corpus import build_corpus  # noqa: E402  (冷启动自愈)
+        build_corpus(corpus_db, write_manifest=False)  # 只建库, 绝不触碰冻结清单
+    conn = sqlite3.connect(corpus_db)
     conn.row_factory = sqlite3.Row
     rows = []
     try:

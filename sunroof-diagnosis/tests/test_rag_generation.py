@@ -15,6 +15,7 @@ import os
 import sqlite3
 import unittest
 
+from corpus.build_corpus import build_corpus  # noqa: E402  (冷启动自愈)
 from evaluation.eval_contract import (
     EVAL_SET_PATH,
     PROJECT_ROOT,
@@ -37,6 +38,10 @@ class TestRagGeneration(unittest.TestCase):
     def setUpClass(cls):
         cls.rows = load_rows()
         cls.by_case = {row["case_id"]: row for row in cls.rows}
+        if not os.path.exists(CORPUS_DB):
+            # 冷启动自愈 (全新 checkout / Linux CI: data/ 不入版本库):
+            # 直连前先确定性重建, 避免空库文件毒化后续「缺省自动重建」判断
+            build_corpus(CORPUS_DB, write_manifest=False)
         conn = sqlite3.connect(CORPUS_DB)
         conn.row_factory = sqlite3.Row
         cls.conn = conn

@@ -16,6 +16,7 @@ import json
 import os
 import unittest
 
+from corpus.build_corpus import build_corpus  # noqa: E402  (冷启动自愈)
 from corpus.check_role_candidates import candidates_for
 from evaluation.eval_contract import CORPUS_MANIFEST_PATH, EVAL_SET_PATH, PROJECT_ROOT
 from retrieval.labels import GUIDE_PATH, load_public_labels
@@ -54,6 +55,11 @@ class TestRetrievalComparison(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.rows = load_rows()
+        corpus_db = os.path.join(PROJECT_ROOT, "data", "corpus-w09.db")
+        if not os.path.exists(corpus_db):
+            # 冷启动自愈 (全新 checkout / Linux CI: data/ 不入版本库):
+            # test_02/test_03 直连语料库, 先确定性重建, 不触碰冻结清单
+            build_corpus(corpus_db, write_manifest=False)
 
     def test_01_manifest_interlock_and_protocol(self):
         with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
