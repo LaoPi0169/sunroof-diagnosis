@@ -78,7 +78,7 @@ STATE = WorkbenchState()
 
 def get_conn():
     if not os.path.exists(CORPUS_DB):
-        build_corpus()
+        build_corpus(CORPUS_DB)
     conn = sqlite3.connect(CORPUS_DB)
     conn.row_factory = sqlite3.Row
     return conn
@@ -304,7 +304,7 @@ def build_index_html() -> str:
 
 def main() -> None:
     if not os.path.exists(CORPUS_DB):
-        build_corpus()
+        build_corpus(CORPUS_DB)
     bind = os.environ.get("SUNROOF_BIND", "127.0.0.1")   # 容器部署设 0.0.0.0
     port = int(os.environ.get("SUNROOF_PORT", "8018"))
     try:
@@ -328,4 +328,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
