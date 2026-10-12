@@ -30,7 +30,7 @@ COPY . /app
 #   3) 该 RUN 行曾临时注释 (Linux CI 未绿前由 GitHub CI STAGE-2 承担 87 用例);
 #      当日远程四阶段 CI 首次全绿 (CI run#8: STAGE-2 Ran 87 tests in 3.169s, exit=0),
 #      RUN 行恢复 —— CI 与镜像构建双质量门同时生效。
-RUN python -c "from corpus.build_corpus import build_corpus; build_corpus('/tmp/corpus-w09-build.db')" \
+RUN python -c "from corpus.build_corpus import build_corpus; build_corpus('/tmp/corpus-w09-build.db', write_manifest=False)" \
     && python -m unittest discover -s tests > /tmp/unittest.log 2>&1; rc=$?; grep -E "^(FAIL|ERROR):" /tmp/unittest.log; tail -n 40 /tmp/unittest.log; exit $rc
 EXPOSE 8018
 
