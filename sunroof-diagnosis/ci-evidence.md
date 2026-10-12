@@ -172,3 +172,38 @@ CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称
   发布至 `ghcr.io/laopi0169/sunroof-workbench`；构建期全量测试即质量门。
 - 根目录课程遗留 `ci.yml`（week08 northstar）加 `paths-ignore: sunroof-diagnosis/**` 避免双通道重复触发。
 - 部署文档对齐: §2 新增"方式 0: GHCR 预构建镜像"（三选一→四选一），§3 测试计数修正 76→80，新增 §11 通道说明。
+
+### §9.3 远程四阶段首次全绿 + 根因3/4 收口（2026-10-12）
+
+远程 CI run#7/run#8 证据（artifact `ci-github-run-*.log` 逐字节核读，详见提交记录）:
+
+- **根因3（悬案收口）**: 冻结 `corpus-manifest-v1.json` 的 `file_path` 按 Windows
+  作者机 os.sep 生成（反斜杠），Linux 全新重建为正斜杠，`test_06_manifest_binding`
+  逐字段比对即败。修复落在**比较端**（分隔符归一化后再比；内容锚 document_id/
+  title/来源 sha256/状态族仍逐字段精确绑定），冻结清单一个字节不动。
+  实证: run#7 STAGE-2 **Ran 87 tests in 3.169s, exit=0** —— Linux 首次全绿。
+- **冷启动自愈群（同轮拆除的潜伏雷，run#7 之前从未被远程执行过）**: `data/`
+  不入版本库，全新检出无 `corpus-w09.db` —— `run_deterministic_baseline` /
+  `run_rag_evaluation` / `run_retrieval_comparison` 三处 `build_corpus()` 无参调用
+  是 TypeError 死分支（sunroof 版 db_path 必填，本地库文件常在从不触发），补实参;
+  `mcptool/run_canary.py` 与 `tests/test_rag_generation.py` / `tests/test_retrieval_
+  comparison.py` 直连语料库前先确定性重建（write_manifest=False，不触碰冻结清单），
+  消除「sqlite 建空库文件毒化后续自愈」模式。验证: 删除 data/corpus-w09.db 模拟
+  裸检出，22/22 测试自愈全绿。
+- **根因4（run#7 唯一红点，STAGE-4）**: `_pick_archive_source` 先探测 "." 候选，
+  而外层课程工作区在仓库根目录跟踪着模板项目**同名** `ci/run_local_ci.py` ——
+  干净检出（无本机嵌套 relic .git 挡刀）上探针命中错误布局，整个工作区被归档成
+  应用，config/corpus 全部错位（`apply_policy_config` exit=2 "config file not
+  found"）。本地直跑侥幸全绿纯因 relic .git 使候选 1 探不中；仿真 clone 复现。
+  修复: 候选改为**子目录优先**（`sunroof-diagnosis/ci/run_local_ci.py` 探中即本项目
+  内容），"." 仅作独立 clone 布局兜底。双布局验证 4/4（仿真 clone + 本地直跑）。
+
+| 阶段 | run#7（e4ae45b，根因3 已修/根因4 未修） | run#8（f9e36c4，根因4 修复） |
+| --- | --- | --- |
+| STAGE-1-schema | PASS | PASS |
+| STAGE-2-unittest | PASS（**87 tests, 3.169s, Linux 首次全绿**） | PASS |
+| STAGE-3-redaction | PASS（32 文件 / 51 输出点 / violations=0） | PASS |
+| STAGE-4-clean-env-smoke | **FAIL**（apply_policy_config exit=2, 根因4） | PASS（4/4） |
+
+远程全绿后 Dockerfile 构建期质量门 RUN 行恢复（§9.2 时期临时注释的解除），
+CI + 镜像构建双质量门同时生效。
