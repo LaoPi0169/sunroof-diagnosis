@@ -56,7 +56,7 @@ def evaluate(unseal: bool) -> dict:
         summary["rerun_reconciled"] = (mismatches == 0)
         return summary
     if not os.path.exists(CORPUS_DB):
-        build_corpus(CORPUS_DB)  # 冷启动自愈: db_path 必填, data/ 目录由 init_db() 幂等创建
+        build_corpus(CORPUS_DB, write_manifest=False)  # 冷启动自愈: 只建库, 绝不触碰冻结清单 (根因5)
     conn = sqlite3.connect(CORPUS_DB)
     conn.row_factory = sqlite3.Row
     labels = load_public_labels()

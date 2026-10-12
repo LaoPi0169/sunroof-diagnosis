@@ -162,7 +162,7 @@ def main(argv: list = None) -> None:
 
     corpus_db = os.path.join(PROJECT_ROOT, "data", "corpus-w09.db")
     if not os.path.exists(corpus_db):
-        build_corpus(corpus_db)  # 冷启动自愈: db_path 必填, data/ 目录由 init_db() 幂等创建
+        build_corpus(corpus_db, write_manifest=False)  # 冷启动自愈: 只建库, 绝不触碰冻结清单 (根因5)
     conn = sqlite3.connect(corpus_db)
     conn.row_factory = sqlite3.Row
     try:
