@@ -16,7 +16,8 @@
 | ⑧ 检索基线比较（阶段 B · 第 11 周） | `week-11/retrieval-comparison-manifest-v1.json`（三输入件 sha256 绑定，先冻结后运行）+ `week-11/keyword-results-v1.jsonl`·`vector-results-v1.jsonl`（48 例 × 2 检索器 × 20 字段）+ 失败登记 6 条 / 回归种子 12 条 / 基线报告 / `retriever-decision-v1.md`（vector 单路晋级）+ `retrieval/`（统一合同 / 标签装载 / 比较运行器）+ **6/6 检索比较测试全绿（53/53 总）** | ✅ |
 | ⑨-⑫ 只读 RAG 收官 + MCP 工具周（W12-15） | `generation/`（门控决策树 + 抽取式替身 + unseal-once 评测器）+ `week-12/rag-per-case-results-v1.jsonl`（60 例解封一次，状态门 60/60，L5=1.0/L6=28/28/L7=0）+ `week-12/rag-evaluation-report-v1.md`·`decision-memo-03.md`（继续但冻结）+ `mcptool/`（只读 case.lookup_context@1 四级鉴权 + 受控写 ticket.create@1 单一规范化/结构化审批/幂等/独立核验）+ `mcptool/run_fixtures.py`（R5+W5 全过, 效果对账恰 1）+ `week-15/attack-cases-v1.md` 7 攻击卡全部防御成立 + `specs/mission-week-12-18.md` | ✅ |
 | ⑬-⑭ 可观测 + 降级 + 值守交接（W16-18，最终交付） | `mcptool/telemetry.py`（TaskTrace 九阶段/终态分类 v1.1/SLI 三口径独立/span 脱敏自检）+ `mcptool/run_canary.py`（60 例重考 CONSISTENT 零漂移）+ `mcptool/kill_switch.py`（封闭枚举+追加审计+无因拒绝）+ 降级门（权限判定优先于降级, action_preview 0 效果审批不消耗）+ `week-17/degradation-drill-evidence-v1.jsonl` + **`workbench_handoff/`（端口 8018 双角色交互工作台: 业务用户问答/工具/受控写全流程, 管理员开关/回滚/审计/金丝雀/重置, 403 强制, 口令零出现）** + `start_workbench_handoff.bat` | ✅ |
-| 阶段 C | （路线图后续: 真实集成/Capstone） | ⬜ 后续 |
+| ⑮ 交互控制台（阶段 C 起步） | `application/static/console.html`（单文件零框架控制台: 身份卡 + RAG 问答/规格核对/任务工作台三面板, 页面零令牌字面量）+ `application/main.py` 追加端点 `GET /`→`/ui`·`/ui`·`/api/v1/session/whoami`·`POST /api/v1/rag/answer`·`/api/v1/rag/corpus-meta`（仅追加能力, 不改既有端点语义）+ `application/rag.py`（语料缺库确定性重建, write_manifest=False 不碰冻结 manifest）+ `start_web_console.bat`（8000 防呆启动器）+ `ci/run_local_ci.py` STAGE-4 布局自适配（嵌套 relic .git / 独立 clone / 工作区子目录三布局通吃）+ `deploy/web-console-usage.md` 使用指南 + **7/7 新测试全绿（87/87 总, 本地四阶段 CI 全绿）** | ✅ |
+| 阶段 C | （路线图后续: 真实集成/Capstone —— ⑮ 已起步） | ⬜ 后续 |
 
 ## 架构（阶段 A 节点 ②③④⑤ 落地部分）
 ```

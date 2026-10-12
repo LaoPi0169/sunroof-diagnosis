@@ -20,5 +20,13 @@ echo   天窗异响诊断 · 交互控制台  (FastAPI API 网关面)
 echo   URL: http://127.0.0.1:8000/ui     健康检查: /health
 echo   接口文档: http://127.0.0.1:8000/docs
 echo ================================================================
+rem 控制台依赖 fastapi/uvicorn (requirements.txt): 优先用工作区 .venv 的解释器
+if exist "%~dp0..\.venv\Scripts\python.exe" (
+  set "PYEXE=%~dp0..\.venv\Scripts\python.exe"
+) else (
+  set "PYEXE=python"
+  echo [提示] 未找到工作区 .venv, 回退系统 python —— 若缺 fastapi 请先:
+  echo        python -m pip install -r "%~dp0requirements.txt"
+)
 start "" http://127.0.0.1:8000/ui
-python -m uvicorn application.main:app --host 127.0.0.1 --port 8000
+"%PYEXE%" -m uvicorn application.main:app --host 127.0.0.1 --port 8000

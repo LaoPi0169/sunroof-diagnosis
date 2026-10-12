@@ -28,6 +28,8 @@ COPY . /app
 # RUN python -c "from corpus.build_corpus import build_corpus; build_corpus('/tmp/corpus-w09-build.db')" \
 #    && python -m unittest discover -s tests > /tmp/unittest.log 2>&1; rc=$?; tail -n 3 /tmp/unittest.log; exit $rc
 #
+# (2026-10-12) 镜像内质量门暂由 GitHub CI STAGE-2 承担 (与本地 ci/run_local_ci.py 同一入口,
+# 87 用例); Linux 全绿后恢复上行 RUN 行, 构建期即在镜像内跑全量测试。
 EXPOSE 8018
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

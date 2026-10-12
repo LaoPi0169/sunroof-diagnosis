@@ -138,20 +138,57 @@ def _wait_health(base_url, timeout_s=30):
     return False
 
 
+def _git(args, cwd, timeout=30):
+    """运行 git 子进程并返回 (exit_code, 去空白输出文本)。"""
+    proc = subprocess.run(
+        ["git"] + args, cwd=cwd, env=SUBPROCESS_ENV, timeout=timeout,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    return proc.returncode, proc.stdout.decode("utf-8", "replace").strip()
+
+
+def _pick_archive_source():
+    """布局自适配: 选一个 HEAD 中真实跟踪 PROJECT_ROOT 内容的 git 仓库。
+
+    背景: 本地工作区可能存在「外层仓库包含 sunroof-diagnosis/ 子目录」(GitHub
+    checkout 同构) 或「PROJECT_ROOT 自身是仓库根」(独立 clone) 两种布局; 个别
+    机器上还会遇到指向历史遗迹的嵌套 .git (其 HEAD 根本不含项目文件)。以
+    ci/run_local_ci.py 在 HEAD 中是否存在为探针, 逐候选验证, 拒绝猜。
+    返回 (repo_root, pathspec, prefix); prefix 为 "" 表示归档无顶层前缀。
+    """
+    project_dir = os.path.basename(os.path.normpath(PROJECT_ROOT))
+    candidates = []  # (repo_root, pathspec)
+    rc, out = _git(["rev-parse", "--show-toplevel"], PROJECT_ROOT)
+    if rc == 0 and out:
+        candidates.append((out, "."))
+    rc, out = _git(
+        ["rev-parse", "--show-toplevel"], os.path.dirname(os.path.normpath(PROJECT_ROOT))
+    )
+    if rc == 0 and out:
+        candidates.append((out, project_dir))
+    for repo_root, pathspec in candidates:
+        probe = "ci/run_local_ci.py" if pathspec == "." else f"{pathspec}/ci/run_local_ci.py"
+        rc2, out2 = _git(["ls-tree", "HEAD", "--", probe], repo_root)
+        if rc2 == 0 and out2:
+            return repo_root, pathspec, ("" if pathspec == "." else pathspec)
+    return None, None, None
+
+
 def stage_4_clean_env_smoke():
     workdir = tempfile.mkdtemp(prefix="sunroof-ci-cold-")
     bundle = os.path.join(workdir, "head.zip")
 
     # 1) 从 git HEAD 打包代码基线 (不含未跟踪文件/本地数据, 等价干净检出);
-    #    git archive 的 pathspec 相对 cwd 解析, 必须在仓库根执行 (PROJECT_ROOT 是子目录)
-    repo_root = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        cwd=PROJECT_ROOT, env=SUBPROCESS_ENV, timeout=30,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-    ).stdout.decode("utf-8", "replace").strip()
+    #    布局自适配见 _pick_archive_source (嵌套 relic .git / 独立 clone / 子目录)
+    repo_root, pathspec, prefix = _pick_archive_source()
+    if repo_root is None:
+        return False, (
+            "git archive failed: 未找到 HEAD 中跟踪本项目内容的 git 仓库 "
+            "(候选: PROJECT_ROOT 自身仓库根 / 外层仓库子目录)"
+        )
     proc = subprocess.run(
-        ["git", "archive", "--format=zip", "HEAD", "sunroof-diagnosis"],
-        cwd=repo_root or PROJECT_ROOT, env=SUBPROCESS_ENV, timeout=60,
+        ["git", "archive", "--format=zip", "HEAD", pathspec],
+        cwd=repo_root, env=SUBPROCESS_ENV, timeout=60,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
     )
     if proc.returncode != 0:
@@ -163,7 +200,8 @@ def stage_4_clean_env_smoke():
     os.makedirs(app_dir, exist_ok=True)
     with zipfile.ZipFile(bundle) as zf:
         zf.extractall(app_dir)
-    app_dir = os.path.join(app_dir, "sunroof-diagnosis")
+    if prefix:
+        app_dir = os.path.join(app_dir, prefix)
 
     # 2) 全新数据库 + 显式环境变量隔离 (绝不继承作者机上的任何业务环境)
     db_path = os.path.join(workdir, "sunroof_clean_env.db")
