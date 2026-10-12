@@ -154,18 +154,28 @@ def _pick_archive_source():
     checkout 同构) 或「PROJECT_ROOT 自身是仓库根」(独立 clone) 两种布局; 个别
     机器上还会遇到指向历史遗迹的嵌套 .git (其 HEAD 根本不含项目文件)。以
     ci/run_local_ci.py 在 HEAD 中是否存在为探针, 逐候选验证, 拒绝猜。
+
+    候选顺序 (根因4, GitHub runner run#7 证据实证): **子目录候选优先**。
+    外层课程工作区在仓库根目录还跟踪着模板项目自己的 ci/run_local_ci.py
+    (同名不同物), 若先探测 "." 会命中错误布局 —— 把整个工作区归档成应用
+    (config/corpus/tests 全部错位, apply_policy_config 找不到配置即秒败)。
+    子目录 pathspec 探中即为本项目内容; 仅当子目录探不中 (独立 clone 布局,
+    父目录不在任何仓库内) 才回退 "." 候选。
+
     返回 (repo_root, pathspec, prefix); prefix 为 "" 表示归档无顶层前缀。
     """
     project_dir = os.path.basename(os.path.normpath(PROJECT_ROOT))
-    candidates = []  # (repo_root, pathspec)
+    subdir_candidate = None  # (repo_root, pathspec)
+    root_candidate = None
     rc, out = _git(["rev-parse", "--show-toplevel"], PROJECT_ROOT)
     if rc == 0 and out:
-        candidates.append((out, "."))
+        root_candidate = (out, ".")
     rc, out = _git(
         ["rev-parse", "--show-toplevel"], os.path.dirname(os.path.normpath(PROJECT_ROOT))
     )
     if rc == 0 and out:
-        candidates.append((out, project_dir))
+        subdir_candidate = (out, project_dir)
+    candidates = [c for c in (subdir_candidate, root_candidate) if c is not None]
     for repo_root, pathspec in candidates:
         probe = "ci/run_local_ci.py" if pathspec == "." else f"{pathspec}/ci/run_local_ci.py"
         rc2, out2 = _git(["ls-tree", "HEAD", "--", probe], repo_root)
