@@ -207,3 +207,21 @@ CI 为本机单进程流水线（uvicorn 子进程 + 临时目录），不宣称
 
 远程全绿后 Dockerfile 构建期质量门 RUN 行恢复（§9.2 时期临时注释的解除），
 CI + 镜像构建双质量门同时生效。
+
+- **根因5（质量门恢复后 CD run#9/#10/#11 连续镜像内 1 失败的定位与收口）**:
+  镜像内 `data/*.db` 被 .dockerignore 排除，冷启动自愈链若以默认
+  `write_manifest=True` 调 `build_corpus`，会把 Linux 重建清单覆写到冻结
+  `corpus-manifest-v1.json`（file_path 分隔符漂移 → sha256 失配，
+  `test_01_manifest_interlock_and_protocol` 失败，82e16521≠fdb6d1a7）。
+  CI runner 上用户上传的 data/corpus-w09.db 恰好存在使自愈分支从不触发、
+  本地 Windows 重建内容与冻结版 LF 归一后一致，两地均未暴露；只有镜像
+  （无 db + Linux 重建）同时满足全部触发条件。
+  修复 5 处调用点（run_deterministic_baseline / run_rag_evaluation /
+  run_retrieval_comparison / workbench_handoff get_conn+main——后两处为
+  上传版本中的同类既有隐患）+ 质量门 RUN 行自身的冷建库命令，全部显式
+  `write_manifest=False`；镜像等价条件（移走 corpus db）回归验证冻结清单
+  raw sha256 逐字节不变。
+- **终态**: CD run#12（cfbf939）镜像内 87 用例全绿，`latest` + `sha-*`
+  发布 GHCR；CI 与镜像构建双质量门同时在线。
+  教训: 自愈/重建类验证此前只断言"测试全绿"，未断言"冻结物逐字节未动"；
+  自本轮起冻结物 raw sha256 前后对照为冷启动改动的标准回归检查。
