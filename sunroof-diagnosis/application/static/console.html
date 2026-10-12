@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天窗总成只读诊断 · 交互控制台</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#1d4ed8;--ok:#15803d;--warn:#b45309;--bad:#b91c1c;--esc:#7c3aed}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#0f172a;color:#e2e8f0;padding:14px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:600}
+header .sub{color:#94a3b8;font-size:12px}
+.dot{width:10px;height:10px;border-radius:50%;background:#64748b;display:inline-block}
+.dot.on{background:#22c55e}
+main{max-width:1080px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:2px}
+input,select,textarea,button{font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:#fff;color:var(--ink)}
+textarea{width:100%;min-height:64px;resize:vertical}
+button{cursor:pointer;background:var(--brand);color:#fff;border:none}
+button.ghost{background:#eef2ff;color:var(--brand)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--brand);background:#eef2ff;cursor:pointer;margin:2px 4px 2px 0}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:#64748b}
+.badge.answered,.badge.confirmed{background:var(--ok)}
+.badge.needs_review{background:var(--warn)}
+.badge.refused{background:var(--bad)}
+.badge.escalated,.badge.escalate,.badge.action_completed{background:var(--esc)}
+.badge.abstained{background:#475569}
+.badge.denied{background:#111827}
+.badge.initialized{background:#0891b2}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{border-top:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;background:#f9fafb;border-top:none}
+.kv{display:grid;grid-template-columns:180px 1fr;gap:4px 12px;font-size:13px;margin:8px 0 0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;word-break:break-all}
+.muted{color:var(--muted);font-size:12px}
+.err{color:var(--bad);font-size:13px;white-space:pre-wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{background:#e2e8f0;color:#334155;border-radius:8px 8px 0 0}
+.tabs button.active{background:#fff;color:var(--brand);font-weight:600}
+.panel{display:none;border-top:2px solid var(--line);padding-top:14px}
+.panel.active{display:block}
+footer{max-width:1080px;margin:0 auto 30px;padding:0 16px;color:var(--muted);font-size:12px}
+code{background:#eef2ff;padding:1px 5px;border-radius:4px;font-size:12px}
+h3{margin:4px 0 10px;font-size:15px}
+</style>
+</head>
+<body>
+<header>
+  <h1>天窗总成只读诊断 · 交互控制台</h1>
+  <span class="sub">阶段 C 节点 ⑮ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
+  <span style="margin-left:auto"><span class="dot" id="health-dot"></span> <span class="sub" id="health-text">健康检查中…</span></span>
+</header>
+<main>
+  <div class="card" id="identity-card">
+    <h3>身份（服务端可信会话 · X-Auth-Token）</h3>
+    <div class="row">
+      <div><label>身份档案</label>
+        <select id="profile">
+          <option value="default">默认 PQE 培训身份（免令牌）</option>
+          <option value="pqe-a">PQE · OEM-A</option>
+          <option value="pqe-b">PQE · OEM-B</option>
+          <option value="supervisor">质量主管（跨项目只读）</option>
+        </select>
+      </div>
+      <div><label>访问令牌（后三档必填，取值见 deploy/web-console-usage.md §2）</label>
+        <input id="token" type="password" size="30" placeholder="留空 = 默认 PQE 培训身份">
+      </div>
+      <div><button id="btn-whoami">应用身份</button></div>
+      <div class="muted" style="flex-basis:100%" id="whoami">未验证身份。令牌只保留在本页内存，不落盘、不进入任何日志或审计。</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button data-tab="rag" class="active">① 只读 RAG 问答（Week-12 门控决策树）</button>
+    <button data-tab="spec">② 装配规格核对（确定性引擎）</button>
+    <button data-tab="tasks">③ 任务工作台（双角色闭环）</button>
+  </div>
+  <div class="panel active" id="panel-rag">
+    <div class="card">
+      <div class="row">
+        <div style="flex:1;min-width:280px"><label>问句（自然语言）</label>
+          <textarea id="rag-query" placeholder="例：东区天窗紧固件复紧按什么顺序执行，工时怎么登记？"></textarea>
+        </div>
+        <div><label>案例 ID（可选）</label><input id="rag-case" size="12" placeholder="WB-MANUAL"></div>
+        <div><button id="btn-ask">提交问答</button></div>
+      </div>
+      <div style="margin-top:8px">
+        <span class="muted">示例（冻结评测集真实问句，点击填入）：</span><br>
+        <span class="chip" data-q="东区天窗紧固件复紧按什么顺序执行，工时怎么登记？">SR-DEV-01 · 可答</span>
+        <span class="chip" data-q="2026-04 批次改装车天窗复位咨询按什么口径答复？">SR-DEV-23 · 冲突门</span>
+        <span class="chip" data-q="异响先换滑轨的旧登记口径还能继续用吗？">SR-DEV-27 · 过期门</span>
+        <span class="chip" data-q="天窗玻璃升降器更换的工时标准是多少？">SR-DEV-21 · 无答案域</span>
+        <span class="chip" data-q="单笔索赔金额的分级审批线是多少？">SR-DEV-31 · 受限域（PQE 升级）</span>
+        <span class="chip" data-q="主管处理：单笔索赔超过分级审批线走什么流程？" data-role="quality_supervisor">SR-DEV-34 · 主管受限池</span>
+      </div>
+      <div id="rag-out" style="margin-top:12px"></div>
+      <p class="muted">口径说明：state 为三态（answered / abstained / escalate），expected_task_state 为预注册四态映射；生成器是确定性抽取式替身（零大模型调用），business_effects 恒 0。PQE 提问受限域（索赔）时内容零泄漏并给出升级下一步。</p>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-spec">
+    <div class="card">
+      <div class="row">
+        <div><label>请求 ID（自动生成）</label><input id="sc-request-id" size="22" readonly></div>
+        <div><label>天窗总成 SN</label><input id="sc-sn" size="18" value="SR-20261001-0001"></div>
+        <div><label>零件号</label>
+          <select id="sc-part">
+            <option value="MOTOR-MOUNT-BOLT-03">MOTOR-MOUNT-BOLT-03（电机安装螺栓）</option>
+            <option value="HEAT-SHIELD-02">HEAT-SHIELD-02（隔热罩，双现行冲突）</option>
+            <option value="UNKNOWN-PART-99">UNKNOWN-PART-99（零匹配）</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>工序</label>
+          <select id="sc-step">
+            <option value="torque_tightening">torque_tightening（扭矩复紧）</option>
+            <option value="gap_check">gap_check（间隙检查）</option>
+          </select>
+        </div>
+        <div><label>测量日期（生效窗口键）</label><input id="sc-date" type="date" value="2026-08-15"></div>
+        <div><label>实测值（N·m / mm）</label><input id="sc-value" type="number" step="0.1" value="9.6" size="6"></div>
+        <div><button id="btn-spec">提交核对</button></div>
+      </div>
+      <div id="spec-out" style="margin-top:12px"></div>
+      <p class="muted">默认身份 ACL 为 OEM-A；任务夹具 TASK-N04-001~004 的事实预填在表单里（9.6 → answered 命中 SPEC-SR-A-V5；11.5 → 21.05% 超硬限 needs_review）。测量日期改到规格生效窗口之外可触发 NO_MATCHING_SPEC。</p>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-tasks">
+    <div class="card">
+      <div class="row">
+        <div><button id="btn-tasks" class="ghost">刷新任务队列</button></div>
+        <span class="muted" id="tasks-hint">PQE 仅见本项目组任务（ACL 过滤）；质量主管跨项目只读。越权动作（如 PQE 直调 supervisor_resolve）会走 denied 路径并留审计，不改任务状态。</span>
+      </div>
+      <div id="tasks-table"></div>
+      <div id="tasks-out" style="margin-top:12px"></div>
+    </div>
+  </div>
+</main>
+<footer>
+  <p><strong>诚实边界：</strong>本控制台是 <code>application/main.py</code> API 网关的交互外壳，仅追加能力、不改既有端点语义。回答来自 Week-12 冻结的确定性门控决策树 + 抽取式替身（零 LLM）；规格核对是 100% 可复算的规则引擎；任务动作幂等并全量落审计（task_action_runs）。另有一个 Week-18 值守交接工作台运行在 <code>:8018</code>（双角色隔离 + 受控写），与本控制台互补。</p>
+  <p>接口文档：<a href="/docs" target="_blank">/docs（Swagger UI）</a> · 健康检查：<a href="/health" target="_blank">/health</a> · 语料元信息：<a href="/api/v1/rag/corpus-meta" target="_blank">/api/v1/rag/corpus-meta</a> · 使用说明：<code>deploy/web-console-usage.md</code></p>
+</footer>
+<script>
+function $id(x){return document.getElementById(x)}
+function esc(s){return String(s===null||s===undefined?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function token(){return $id('token').value.trim()}
+function stateZh(s){return ({answered:'answered 已作答',abstained:'abstained 弃答',escalate:'escalate 升级',needs_review:'needs_review 待复核',refused:'refused 拒答',escalated:'escalated 已升级',confirmed:'confirmed 已确认',denied:'denied 已阻断',initialized:'initialized 待处理',action_completed:'action_completed 已结案'})[s]||s}
+function badge(s){return '<span class="badge '+esc(s)+'">'+esc(stateZh(s))+'</span>'}
+function kv(k,v){return '<dt>'+k+'</dt><dd>'+((v===null||v===undefined||v==='')?'<span class="muted">—</span>':v)+'</dd>'}
+var CURRENT_ROLE=null;
+
+/* ES5 fetch 封装: X-Auth-Token 只从本页令牌框读取 */
+function api(method,path,body,cb){
+  var x=new XMLHttpRequest();
+  x.open(method,path,true);
+  x.setRequestHeader('Content-Type','application/json;charset=utf-8');
+  var t=token();
+  if(t){x.setRequestHeader('X-Auth-Token',t)}
+  x.onreadystatechange=function(){
+    if(x.readyState!==4){return}
+    var j=null;
+    try{j=JSON.parse(x.responseText)}catch(e){}
+    if(x.status>=200&&x.status<300){cb(null,j)}
+    else{
+      var d=j&&j.detail;
+      var m=d?(typeof d==='string'?d:JSON.stringify(d)):(x.responseText||('HTTP '+x.status));
+      cb(new Error('HTTP '+x.status+' · '+m),j);
+    }
+  };
+  x.send(body===undefined?null:JSON.stringify(body));
+}
+
+/* ---------- 身份 ---------- */
+function applyWhoami(){
+  api('GET','/api/v1/session/whoami',undefined,function(err,j){
+    if(err){$id('whoami').innerHTML='<span class="err">'+esc(err.message)+'</span>';CURRENT_ROLE=null;return}
+    CURRENT_ROLE=j.user_role;
+    $id('whoami').innerHTML='当前身份：<code>'+esc(j.user_id)+'</code> · 角色 <code>'+esc(j.user_role)+'</code> · ACL 项目组 <code>'+esc(j.allowed_oem_projects.join(', '))+'</code>'+(j.user_role==='quality_supervisor'?'（跨项目只读）':'');
+    if($id('panel-tasks').classList.contains('active')){loadTasks()}
+  });
+}
+$id('btn-whoami').onclick=function(){
+  var p=$id('profile').value;
+  if(p==='default'){$id('token').value=''}
+  applyWhoami();
+};
+
+/* ---------- 面板 ①: 只读 RAG 问答 ---------- */
+function renderRag(j){
+  var cits=(j.citations||[]).map(function(c){
+    return '<tr><td>'+esc(c.document_id)+'</td><td>'+esc(c.chunk_id)+'</td><td>'+esc(c.source_version)+'</td><td>'+esc(c.effective_status)+'</td></tr>';
+  }).join('');
+  $id('rag-out').innerHTML='<div class="card">'
+    +'<p>'+badge(j.state)+' <span class="muted">→ 映射任务状态</span> '+badge(j.expected_task_state)
+    +' <span class="muted">· case_id='+esc(j.case_id)+' · request_id='+esc(j.request_id)+'</span></p>'
+    +'<p style="font-size:15px;margin:6px 0">'+(j.answer_text?esc(j.answer_text):'<span class="muted">（无答案正文 —— 阻断/升级路径内容零泄漏）</span>')+'</p>'
+    +'<dl class="kv">'+kv('reason_code',esc(j.reason_code))+kv('user_next_step',esc(j.user_next_step))
+    +kv('confidence_top1',j.confidence_top1)+kv('restricted_candidate_count',j.restricted_candidate_count)
+    +kv('business_effects',j.business_effects+'（恒 0 —— 只读承诺）')+kv('generator_mode',esc(j.generator_mode))+'</dl>'
+    +(cits?'<table><thead><tr><th>document_id</th><th>chunk_id</th><th>source_version</th><th>effective_status</th></tr></thead><tbody>'+cits+'</tbody></table>':'')
+    +'</div>';
+}
+$id('btn-ask').onclick=function(){
+  var q=$id('rag-query').value.trim();
+  if(!q){$id('rag-out').innerHTML='<p class="err">问句不能为空。</p>';return}
+  var body={query:q};
+  var c=$id('rag-case').value.trim();
+  if(c){body.case_id=c}
+  $id('rag-out').innerHTML='<p class="muted">请求中…（门控决策树 + 抽取式替身，零 LLM）</p>';
+  api('POST','/api/v1/rag/answer',body,function(err,j){
+    if(err){$id('rag-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    renderRag(j);
+  });
+};
+(function(){
+  var chips=document.querySelectorAll('.chip');
+  for(var i=0;i<chips.length;i++){
+    chips[i].onclick=function(){
+      $id('rag-query').value=this.getAttribute('data-q');
+      if(this.getAttribute('data-role')&&CURRENT_ROLE!==this.getAttribute('data-role')){
+        $id('rag-out').innerHTML='<p class="muted">提示：该示例为质量主管受限池问句，请先在上方切换到「质量主管」身份（粘贴对应令牌）再提交。</p>';
+      }
+    };
+  }
+})();
+/* ---------- 面板 ②: 装配规格核对 ---------- */
+function newRequestId(){return 'req-web-'+Date.now()+'-'+Math.floor(Math.random()*900+100)}
+$id('btn-spec').onclick=function(){
+  var v=parseFloat($id('sc-value').value);
+  if(!v||v<=0){$id('spec-out').innerHTML='<p class="err">实测值必须为正数。</p>';return}
+  var body={
+    request_id:newRequestId(),
+    task_type:'spec_check',
+    sn:$id('sc-sn').value.trim(),
+    part_no:$id('sc-part').value,
+    process_step:$id('sc-step').value,
+    measured_at:$id('sc-date').value,
+    measured_value:v
+  };
+  $id('spec-out').innerHTML='<p class="muted">请求中…（ACL 下推 + 现行有效规格匹配 + 偏差硬限，100% 确定性）</p>';
+  api('POST','/api/v1/spec-check',body,function(err,j){
+    if(err){$id('spec-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    var sp=j.spec, ev=j.evaluation, rv=j.reviewer_preview;
+    $id('spec-out').innerHTML='<div class="card"><p>'+badge(j.status)
+      +' <span class="muted">· request_id='+esc(j.request_id)+' · conformance_passed='+(j.conformance_passed?'true':'false')+'</span></p>'
+      +'<dl class="kv">'+kv('reason_code',esc(j.reason_code))
+      +(sp?'<dt>spec</dt><dd>'+esc(sp.spec_id)+' / '+esc(sp.title)+' · 版本 '+esc(sp.version)+' · 生效 '+esc(sp.effective_at)+(sp.expires_at?' ~ '+esc(sp.expires_at):'')+' · 依据 '+esc(sp.source_ref)+' · 单位 '+esc(sp.unit)+'</dd>':'')
+      +(ev?'<dt>evaluation</dt><dd>标称 '+ev.nominal_value+' · 公差 '+esc(ev.tolerance)+' · 实测 '+ev.measured_value+' · 偏差 <strong>'+ev.deviation_pct+'%</strong> · 判定 '+esc(ev.conformance)+'<br><span class="muted">'+esc(ev.formula_rule)+'</span></dd>':'')
+      +(rv?'<dt>reviewer_preview</dt><dd>目标角色 '+esc(rv.target_role)+' · 建议动作 '+esc(rv.suggested_action)+' · 原因 '+esc(rv.reason)+'</dd>':'')
+      +'</dl></div>';
+  });
+};
+
+/* ---------- 面板 ③: 任务工作台 ---------- */
+function esc2(s){return esc(s)}
+function corr(){return 'corr-web-'+Date.now()+'-'+Math.floor(Math.random()*900+100)}
+function taskAction(taskId,action){
+  var body={task_id:taskId,action:action,correlation_id:corr()};
+  if(action==='escalate'){body.idempotency_key='idem-'+taskId+'-'+Date.now()}
+  api('POST','/api/v1/tasks/action',body,function(err,j){
+    if(err){$id('tasks-out').innerHTML='<div class="card"><p class="err">'+esc(err.message)+'</p></div>'+$id('tasks-out').innerHTML;return}
+    $id('tasks-out').innerHTML='<div class="card"><p>'+badge(j.status)
+      +' <span class="muted">· task='+esc(j.task_id)+' · correlation_id='+esc(j.correlation_id)
+      +(j.is_idempotent?' · <strong>幂等重放</strong>':'')+'</span></p>'
+      +'<dl class="kv">'+kv('reason_code',esc(j.reason_code))+kv('message',j.message?esc(j.message):null)
+      +kv('candidate_spec',j.candidate_spec?esc(j.candidate_spec.spec_id):null)+'</dl></div>'
+      +$id('tasks-out').innerHTML;
+    loadTasks(false);
+  });
+}
+function renderTasks(tasks){
+  if(!tasks.length){$id('tasks-table').innerHTML='<p class="muted">当前身份 ACL 内没有任务。</p>';return}
+  var isSup=(CURRENT_ROLE==='quality_supervisor');
+  var rows=tasks.map(function(t){
+    var acts=['check_spec','confirm','refuse','escalate'];
+    if(isSup){acts.push('supervisor_resolve')}
+    var btns=acts.map(function(a){
+      return '<button class="ghost" onclick="taskAction(\''+esc(t.task_id)+'\',\''+a+'\')">'+a+'</button>';
+    }).join(' ');
+    return '<tr><td><code>'+esc(t.task_id)+'</code><br><span class="muted">'+esc(t.case_id)+'</span></td>'
+      +'<td>'+esc(t.oem_project)+'</td><td>'+esc(t.part_no)+'<br><span class="muted">'+esc(t.process_step)+' · '+t.measured_value+'</span></td>'
+      +'<td>'+esc(t.measured_at)+'</td><td>'+badge(t.status)+'<br><span class="muted">'+esc(t.reason_code||'')+(t.matched_spec_id?' · '+esc(t.matched_spec_id):'')+'</span></td>'
+      +'<td>'+btns+'</td></tr>';
+  }).join('');
+  $id('tasks-table').innerHTML='<table><thead><tr><th>任务 / 案例</th><th>项目组</th><th>零件 / 工序</th><th>测量日期</th><th>状态</th><th>动作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function loadTasks(showHint){
+  $id('tasks-table').innerHTML='<p class="muted">加载中…</p>';
+  api('GET','/api/v1/tasks',undefined,function(err,j){
+    if(err){$id('tasks-table').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    renderTasks(j.tasks||[]);
+    if(showHint!==false){/* 首次加载不额外提示 */}
+  });
+}
+$id('btn-tasks').onclick=function(){loadTasks()};
+
+/* ---------- 标签页与健康检查 ---------- */
+(function(){
+  var tabs=document.querySelectorAll('.tabs button');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].onclick=function(){
+      var k=this.getAttribute('data-tab'),ts=document.querySelectorAll('.tabs button'),ps=document.querySelectorAll('.panel'),n;
+      for(n=0;n<ts.length;n++){ts[n].className=(ts[n]===this?'active':'')}
+      for(n=0;n<ps.length;n++){ps[n].className='panel'+(ps[n].id==='panel-'+k?' active':'')}
+      if(k==='tasks'){loadTasks()}
+      if(k==='spec'){$id('sc-request-id').value=newRequestId()}
+    };
+  }
+})();
+(function(){
+  var x=new XMLHttpRequest();
+  x.open('GET','/health',true);
+  x.onreadystatechange=function(){
+    if(x.readyState!==4){return}
+    if(x.status===200){$id('health-dot').className='dot on';$id('health-text').textContent='服务正常 · '+$id('health-text').textContent.replace('健康检查中…','application/main.py 网关在线')}
+    else{$id('health-dot').className='dot';$id('health-text').textContent='服务异常 (HTTP '+x.status+')'}
+  };
+  x.send();
+})();
+$id('sc-request-id').value=newRequestId();
+applyWhoami();
+</script>
+</body>
+</html>
+
+

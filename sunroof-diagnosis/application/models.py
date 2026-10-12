@@ -160,3 +160,58 @@ class TaskResponse(BaseModel):
     correlation_id: str
     message: Optional[str] = None
     is_idempotent: bool = False
+
+
+# ============================================================================
+# 阶段 C 节点 ⑮: 只读 RAG 问答 + 会话身份 DTO (回链 generation/contract.py
+# Week-12 冻结的 13 字段记录结构; 身份仍只来自服务端可信会话)
+# ============================================================================
+
+
+class RagAnswerRequest(BaseModel):
+    """RAG 问答请求 Schema (封闭契约: 自报 role 等未知字段直接 422)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(..., min_length=1, max_length=500,
+                       description="自然语言问句 (门控决策树 + 抽取式替身, 零 LLM)")
+    case_id: Optional[str] = Field(default=None, max_length=64,
+                                   description="可选案例标识 (缺省 WB-MANUAL)")
+
+
+class RagCitation(BaseModel):
+    """引用条目 (Week-12 冻结四字段; answered 时非空)"""
+
+    document_id: str
+    chunk_id: str
+    source_version: str
+    effective_status: str
+
+
+class RagAnswerResponse(BaseModel):
+    """RAG 问答响应 (与 week-12 逐例结果逐字段同构):
+
+    state 为三态 (answered/abstained/escalate), expected_task_state 为预注册的
+    四态映射 (answered/needs_review/refused/escalated); business_effects 恒 0。
+    """
+    case_id: str
+    user_role: str
+    state: str
+    expected_task_state: str
+    answer_text: Optional[str] = None
+    citations: List[RagCitation] = []
+    reason_code: Optional[str] = None
+    user_next_step: Optional[str] = None
+    confidence_top1: float = 0.0
+    restricted_candidate_count: int = 0
+    business_effects: int = 0
+    request_id: str
+    generator_mode: str
+
+
+class SessionIdentity(BaseModel):
+    """当前可信会话身份回显 (调试用; 绝不回显令牌本身)"""
+
+    user_id: str
+    user_role: str
+    allowed_oem_projects: List[str]

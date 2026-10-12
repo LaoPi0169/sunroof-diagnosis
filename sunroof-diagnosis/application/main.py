@@ -7,13 +7,25 @@ FastAPI 应用入口 (API Gateway / Presentation Layer)
 零大模型、零外部写副作用 (仅追加 task_runs / task_action_runs 审计行)。
 后续节点 (部署回滚/只读 MCP/RAG) 仅追加能力, 不改本接口语义。
 """
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import FileResponse, RedirectResponse
 
 from application.auth import get_trusted_user_from_session
 from application.database import get_spec_check_task, init_db, list_spec_check_tasks
-from application.models import SpecCheckRequest, SpecCheckResponse, TaskActionRequest, TaskResponse, TrustedUser
+from application.models import (
+    RagAnswerRequest,
+    RagAnswerResponse,
+    SessionIdentity,
+    SpecCheckRequest,
+    SpecCheckResponse,
+    TaskActionRequest,
+    TaskResponse,
+    TrustedUser,
+)
+from application.rag import answer_query, corpus_meta
 from application.services import process_spec_check
 from application.tasks import process_task_action
 
@@ -87,3 +99,67 @@ def list_tasks_endpoint(
 @app.get("/health", summary="健康检查")
 def health_check():
     return {"status": "ok", "app": "sunroof-spec-check-slice-v1"}
+
+
+# ============================================================================
+# 阶段 C 节点 ⑮: 交互控制台 + 只读 RAG 问答 HTTP 面
+# (仅追加能力, 不改既有端点语义; 回链 deploy/web-console-usage.md)
+# ============================================================================
+
+_CONSOLE_HTML = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "static", "console.html"
+)
+
+
+@app.get("/", include_in_schema=False, summary="重定向到交互控制台 /ui")
+def root_redirect():
+    return RedirectResponse(url="/ui", status_code=302)
+
+
+@app.get("/ui", include_in_schema=False, summary="交互控制台 (静态单文件, 零框架)")
+def ui_console():
+    return FileResponse(_CONSOLE_HTML, media_type="text/html; charset=utf-8")
+
+
+@app.get(
+    "/api/v1/session/whoami",
+    response_model=SessionIdentity,
+    summary="回显当前可信会话身份 (调试用; 绝不回显令牌本身)",
+)
+def session_whoami(
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> SessionIdentity:
+    """与业务端点共用同一鉴权依赖: 身份完全来自服务端 X-Auth-Token 校验。"""
+    return SessionIdentity(
+        user_id=trusted_user.user_id,
+        user_role=trusted_user.user_role,
+        allowed_oem_projects=trusted_user.allowed_oem_projects,
+    )
+
+
+@app.post(
+    "/api/v1/rag/answer",
+    response_model=RagAnswerResponse,
+    summary="只读 RAG 问答 (Week-12 门控决策树: 词门/越权检测/无答案域/抽取式作答)",
+    status_code=status.HTTP_200_OK,
+)
+def rag_answer_endpoint(
+    request: RagAnswerRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> RagAnswerResponse:
+    """
+    把 Week-12 冻结的 answer_case 以 HTTP 形式追加暴露 (仅追加能力):
+    * 身份只来自服务端可信会话 (X-Auth-Token), user_role 映射门控决策树角色池;
+    * 语料库缺失时确定性重建 (write_manifest=False, 不触碰冻结 manifest);
+    * 零 LLM 调用、零业务写副作用 (business_effects 恒 0)。
+    """
+    record = answer_query(request.query, trusted_user.user_role, request.case_id)
+    return RagAnswerResponse(**record)
+
+
+@app.get(
+    "/api/v1/rag/corpus-meta",
+    summary="语料库元信息 (快照 ID / 文档数 / chunk 数; 控制台数据源)",
+)
+def rag_corpus_meta():
+    return corpus_meta()
