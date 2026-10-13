@@ -38,6 +38,7 @@ SCOPE_FILES = [
     os.path.join("application", "services.py"),
     os.path.join("application", "tasks.py"),
     os.path.join("application", "mes.py"),
+    os.path.join("application", "plm.py"),
     "workbench_cli.py",
     os.path.join("deploy", "apply_policy_config.py"),
     os.path.join("deploy", "smoke_w08.py"),
@@ -66,6 +67,9 @@ SCOPE_FILES = [
     os.path.join("mcptool", "mes_contract.py"),
     os.path.join("mcptool", "mes_store.py"),
     os.path.join("mcptool", "mes_server.py"),
+    os.path.join("mcptool", "plm_contract.py"),
+    os.path.join("mcptool", "plm_store.py"),
+    os.path.join("mcptool", "plm_server.py"),
     os.path.join("workbench_handoff", "app.py"),
 ]
 

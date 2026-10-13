@@ -258,3 +258,45 @@ Linux CI / Windows 本地 / Docker 镜像三处同值。
   语义全部不动（本节点仅追加工具/端点/面板/扫描范围 +4 文件）。
 - 诚实边界: MES 为确定性合成夹具（零真实 MES 连接）; 凭证治理沿用教学模拟静态
   Token（R-4 口径不变, 上线前需按真实 SSO 重审权限矩阵）。
+
+
+## 11. 阶段 C 节点 ⑱ —— PLM 工程记录查询 · 只读 PLM MCP 工具（2026-10-13）
+
+discovery-brief-v1.md In-Scope 第 2 条的 PLM 半边兑现。交付只读 MCP 工具
+`plm.lookup_engineering_record@1`: `mcptool/plm_contract.py` 封闭合同 →
+`api-contract/plm-lookup-v1.json` 同值互锁（test_12 逐项断言, 改合同必须同步改码）;
+`plm_store.py` 确定性合成 PLM 夹具 4 条记录（SR-FRAME-A01 六条 ECO / SR-GLASS-A01 /
+SR-MOTOR-A02 / SR-RAIL-B01）synthetic=true 零写入口; `plm_server.py`
+schema→RBAC→ACL→只读取数校验链; HTTP 面 `POST /api/v1/plm/engineering-record`
+（application 仅追加, 不改既有端点语义）+ 控制台第五面板「PLM 工程记录查询」。
+
+保护指标落地:
+- **P-1 图纸硬门槛（矩阵 §2 跨 OEM 敏感图纸）**: drawing_registry 只回登记元数据
+  （drawing_id/revision/title/status + server 组装 count）, content_disclosure=
+  denied_by_policy; 图纸内容/文件/链接/base64 渲染数据永不出工具, 主管亦不展示
+  （test_10 禁词扫描 + PQE/主管双角色断言）。
+- **P-1 零存在性泄漏**: 跨项目（SR-RAIL-B01）/ 未知件号 / 角色不足三因用户面封套
+  逐字节一致, 细分原因 reason_typed=cross_project_denied/unknown_part/role_denied
+  只进受限审计, 每条带 run_id, external_effects 恒 0。
+- **P-3**: 已知记录缺失字段返回字段级结构化 not_available
+  （reason_code=FIELD_NOT_AVAILABLE, MOTOR-A02 无图纸登记）, 响应内零编造数值。
+- **R-2 收口**: ECO 历史 6 条按 4 条/页冻结分页（eco_offset 0..12, total_changes/
+  returned_changes/truncated/next_offset）, 任何 ECO 载荷永不超过单页上限,
+  不引入全量回传（空窗合法）。
+
+§9.3 教训的标准落地: `plm_store.store_fingerprint()`（静态记录 + ECO 指针 sha256）
+作为只读性质回归锚点 —— test_11 对 5 类调用路径（含 3 类失败路径）前后对照指纹
+逐字节一致; test_13 另断言同参数两次调用 result 逐字节一致（零随机零时钟）。
+
+本地四阶段 CI（节点 ⑱ 代码基线）:
+- STAGE-1-schema PASS; **STAGE-2-unittest PASS（Ran 113 tests in 21.374s, exit=0
+  —— 100 存量 + 13 新增）**; STAGE-3-redaction PASS（**40 文件** / 53 出射点 /
+  violations=0）; STAGE-4-clean-env-smoke PASS（4/4）。
+- 新增 13 测试: 工具面 12（01 合法三字段 / 02 ECO 分页走查 / 03 P-1 封套逐字节一致 /
+  04 主管跨项目只读 / 05 角色默认拒绝 / 06 身份夹带与上下文形状 / 07 封闭字段枚举 /
+  08 件号冻结语法不归一化 / 09 P-3 结构化缺失 / 10 图纸硬门槛 / 11 只读指纹+审计分型 /
+  12 合同互锁）+ HTTP 面确定性/身份矩阵/401 不落审计/422 封闭契约/控制台面板（13）。
+- 冻结面零改动: Week-13 冻结的 billing MCP 工具语义、冻结 manifest、既有端点语义
+  全部不动（本节点仅追加工具/端点/面板/扫描范围 +5 文件）。
+- 诚实边界: PLM 为确定性合成夹具（零真实 PLM 连接）; 凭证治理沿用教学模拟静态
+  Token（R-4 口径不变, 上线前需按真实 SSO 重审权限矩阵）。

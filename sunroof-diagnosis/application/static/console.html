@@ -52,7 +52,7 @@ h3{margin:4px 0 10px;font-size:15px}
 <body>
 <header>
   <h1>天窗总成只读诊断 · 交互控制台</h1>
-  <span class="sub">阶段 C 节点 ⑮+⑰ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
+  <span class="sub">阶段 C 节点 ⑮+⑰+⑱ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
   <span style="margin-left:auto"><span class="dot" id="health-dot"></span> <span class="sub" id="health-text">健康检查中…</span></span>
 </header>
 <main>
@@ -79,6 +79,7 @@ h3{margin:4px 0 10px;font-size:15px}
     <button data-tab="spec">② 装配规格核对（确定性引擎）</button>
     <button data-tab="tasks">③ 任务工作台（双角色闭环）</button>
     <button data-tab="mes">④ MES 生产记录抓取（只读 MCP · 节点 ⑰）</button>
+    <button data-tab="plm">⑤ PLM 工程记录查询（只读 MCP · 节点 ⑱）</button>
   </div>
   <div class="panel active" id="panel-rag">
     <div class="card">
@@ -156,6 +157,22 @@ h3{margin:4px 0 10px;font-size:15px}
       </div>
       <div id="mes-out" style="margin-top:12px"></div>
       <p class="muted">只读 MCP 工具 <code>mes.lookup_production_record@1</code>（effect=read_only，外部写效果恒 0；波形 128 点 × 32 点/段 × 4 段冻结分页，绝不全量回传）。默认身份 ACL 为 OEM-A：ROOF-10001/10002/10003 可见（10003 无波形通道 → 字段级结构化缺失 P-3）；跨项目 SN（ROOF-20001）与未知 SN 返回完全一致的 not_available 封套（零存在性泄漏 P-1，细分原因只进服务端受限审计）。MES 为确定性合成夹具（synthetic=true），波形纯整数生成零随机零时钟。</p>
+    </div>
+  </div>
+  <div class="panel" id="panel-plm">
+    <div class="card">
+      <div class="row">
+        <div><label>零件号（冻结语法 SR-…-A01/B01）</label><input id="plm-part" size="16" value="SR-FRAME-A01"></div>
+        <div style="min-width:300px"><label>请求字段（1..3 个）</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="plm-f-bom" checked> bom_snapshot</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="plm-f-eco" checked> eco_history</label>
+          <label style="display:inline-block"><input type="checkbox" id="plm-f-dwg" checked> drawing_registry</label>
+        </div>
+        <div><label>ECO 分页偏移（0..12，每页≤4）</label><input id="plm-off" type="number" min="0" max="12" value="0" size="4"></div>
+        <div><button id="btn-plm">查询工程记录</button></div>
+      </div>
+      <div id="plm-out" style="margin-top:12px"></div>
+      <p class="muted">只读 MCP 工具 <code>plm.lookup_engineering_record@1</code>（effect=read_only，外部写效果恒 0；ECO 历史 4 条/页冻结上限，绝不全量回传；图纸只回登记元数据，content_disclosure=denied_by_policy —— 图纸内容/文件/链接永不出工具，矩阵 §2 跨 OEM 敏感图纸硬门槛，主管亦不展示）。默认身份 ACL 为 OEM-A：SR-FRAME-A01 / SR-GLASS-A01 / SR-MOTOR-A02 可见（MOTOR-A02 无图纸登记 → 字段级结构化缺失 P-3；FRAME-A01 有 6 条 ECO → 分页演示）；跨项目件号（SR-RAIL-B01）与未知件号返回完全一致的 not_available 封套（零存在性泄漏 P-1）。PLM 为确定性合成夹具（synthetic=true）。</p>
     </div>
   </div>
 </main>
@@ -373,6 +390,66 @@ $id('btn-mes').onclick=function(){
     Object.keys(fs).forEach(function(k){parts.push(mesFieldCard(k,fs[k]))});
     parts.push('</div>');
     $id('mes-out').innerHTML=parts.join('');
+  });
+};
+
+/* ---------- ⑤ PLM 工程记录查询 (节点 ⑱ · 只读 MCP) ---------- */
+function plmFields(){
+  var fs=[];
+  if($id('plm-f-bom').checked){fs.push('bom_snapshot')}
+  if($id('plm-f-eco').checked){fs.push('eco_history')}
+  if($id('plm-f-dwg').checked){fs.push('drawing_registry')}
+  return fs;
+}
+function plmFieldCard(name,entry){
+  if(entry.status!=='available'){
+    return '<p>· <code>'+esc(name)+'</code> <span class="muted">not_available · '+esc(entry.reason_code||'')+'（结构化缺失, 绝不编造）</span></p>';
+  }
+  var p=entry.payload;
+  if(name==='bom_snapshot'){
+    var rows=(p.items||[]).map(function(r){
+      return '<tr><td>'+esc(r.component_no)+'</td><td>'+esc(r.description)+'</td><td>'+r.quantity+'</td><td>'+esc(r.supplier_code)+'</td></tr>';
+    }).join('');
+    return '<p>· <code>'+esc(name)+'</code>（版本 '+esc(p.revision)+' · '+p.count+' 个部件）</p>'
+      +'<table><thead><tr><th>部件号</th><th>描述</th><th>数量</th><th>供应商</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  if(name==='eco_history'){
+    var rows2=(p.changes||[]).map(function(r){
+      return '<tr><td>'+esc(r.eco_id)+'</td><td>'+esc(r.change_type)+'</td><td>'+esc(r.from_revision)+' → '+esc(r.to_revision)+'</td><td>'+esc(r.effective_at)+'</td><td>'+esc(r.reason)+'</td></tr>';
+    }).join('');
+    return '<p>· <code>'+esc(name)+'</code>（共 '+p.total_changes+' 条 · 本页 '+p.returned_changes+' 条（上限 '+p.max_return+'） · '
+      +(p.truncated?'截断，next_offset='+p.next_offset:'无后续页')+'）</p>'
+      +'<table><thead><tr><th>ECO</th><th>类型</th><th>版本迁移</th><th>生效日</th><th>原因</th></tr></thead><tbody>'+rows2+'</tbody></table>';
+  }
+  var rows3=(p.drawings||[]).map(function(r){
+    return '<tr><td>'+esc(r.drawing_id)+'</td><td>'+esc(r.revision)+'</td><td>'+esc(r.title)+'</td><td>'+esc(r.status)+'</td></tr>';
+  }).join('');
+  return '<p>· <code>'+esc(name)+'</code>（'+p.count+' 张图纸登记元数据 · content_disclosure=<code>'+esc(p.content_disclosure)+'</code>）</p>'
+    +'<table><thead><tr><th>图号</th><th>版本</th><th>标题</th><th>状态</th></tr></thead><tbody>'+rows3+'</tbody></table>'
+    +'<p class="muted">图纸内容/文件/链接永不出工具（矩阵 §2 跨 OEM 敏感图纸硬门槛, 主管亦不展示）。</p>';
+}
+$id('btn-plm').onclick=function(){
+  var body={part_no:$id('plm-part').value.trim(),fields:plmFields()};
+  var off=$id('plm-off').value;
+  if(off!==''){body.eco_offset=parseInt(off,10)}
+  $id('plm-out').innerHTML='<p class="muted">查询中…</p>';
+  api('POST','/api/v1/plm/engineering-record',body,function(err,j){
+    if(err){$id('plm-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    if(!j.ok){
+      $id('plm-out').innerHTML='<div class="card"><p>'+badge('denied')
+        +' <span class="muted">error.code='+esc((j.error||{}).code)+' · run_id='+esc(j.run_id)
+        +' · business_effects='+j.business_effects+'</span></p>'
+        +'<p class="muted">跨项目组 / 未知件号 / 角色不足三者封套完全一致（零存在性泄漏）；细分原因只进服务端受限审计。</p></div>';
+      return;
+    }
+    var r=j.result||{},parts=['<div class="card"><p><span class="badge answered">available</span>'
+      +' <span class="muted">part_no='+esc(r.part_no)+' · oem_project='+esc(r.oem_project)
+      +' · tool='+esc(j.tool)+'@'+esc(j.version)+' · effect='+esc(j.effect)
+      +' · run_id='+esc(j.run_id)+' · business_effects='+j.business_effects+'</span></p>'];
+    var fs=r.fields||{};
+    Object.keys(fs).forEach(function(k){parts.push(plmFieldCard(k,fs[k]))});
+    parts.push('</div>');
+    $id('plm-out').innerHTML=parts.join('');
   });
 };
 

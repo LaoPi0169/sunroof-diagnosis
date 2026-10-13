@@ -18,6 +18,8 @@ from application.database import get_spec_check_task, init_db, list_spec_check_t
 from application.models import (
     MesLookupRequest,
     MesLookupResponse,
+    PLMLookupRequest,
+    PLMLookupResponse,
     RagAnswerRequest,
     RagAnswerResponse,
     SessionIdentity,
@@ -28,6 +30,7 @@ from application.models import (
     TrustedUser,
 )
 from application import mes as mes_gateway
+from application import plm as plm_gateway
 from application.rag import answer_query, corpus_meta
 from application.services import process_spec_check
 from application.tasks import process_task_action
@@ -196,3 +199,37 @@ def mes_production_record_endpoint(
     record = mes_gateway.lookup_production_record(
         request.sn, [f.value for f in request.fields], request.segment, trusted_user)
     return MesLookupResponse(**record)
+
+
+# ============================================================================
+# 阶段 C 节点 ⑱: PLM 工程记录查询 HTTP 面 (只读 MCP 工具)
+# discovery-brief-v1.md In-Scope 第 2 条 PLM 半边的阶段 C 兑现; 图纸只回登记
+# 元数据 (content_disclosure=denied_by_policy, P-1 跨 OEM 敏感图纸硬门槛);
+# ECO 历史按冻结上限分页 (api-contract/plm-lookup-v1.json)。
+# ============================================================================
+
+
+@app.post(
+    "/api/v1/plm/engineering-record",
+    response_model=PLMLookupResponse,
+    summary="按零件号只读查询 PLM 工程记录 (BOM/ECO 工程变更版本/图纸登记元数据, 只读 MCP)",
+    status_code=status.HTTP_200_OK,
+)
+def plm_engineering_record_endpoint(
+    request: PLMLookupRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> PLMLookupResponse:
+    """
+    把 mcptool plm.lookup_engineering_record@1 以 HTTP 形式追加暴露 (仅追加能力):
+    * 身份只来自服务端可信会话 (X-Auth-Token); 跨项目/未知件号/角色不足三者
+      用户面封套逐字节一致 (零存在性泄漏, P-1), 细分原因只进受限审计;
+    * ECO 历史按冻结上限分页 (每页最多 4 条, eco_offset 0..12), 绝不全量回传;
+    * 图纸只返回登记元数据 (content_disclosure=denied_by_policy), 图纸内容/
+      文件/链接永不出工具 (P-1 跨 OEM 敏感图纸硬门槛, 主管亦不展示);
+    * 字段缺失返回字段级结构化 not_available, 绝不编造数据 (P-3);
+    * 零业务写副作用 (effect=read_only, business_effects 恒 0)。
+    """
+    record = plm_gateway.lookup_engineering_record(
+        request.part_no, [f.value for f in request.fields], request.eco_offset,
+        trusted_user)
+    return PLMLookupResponse(**record)

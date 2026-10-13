@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plm-lookup-v1",
+  "title": "plm.lookup_engineering_record@1 只读 MCP 工具契约（阶段 C 节点 ⑱ 冻结）",
+  "description": "回链 specs/discovery-brief-v1.md In-Scope 第 2 条 PLM 半边（匹配 PLM 中的 BOM/ECO 工程变更版本，阶段 C 以只读 MCP 工具实现）与保护指标 P-1（跨 OEM 敏感图纸越权泄露 0 次：本工具只返回图纸登记元数据且 content_disclosure=denied_by_policy，图纸内容/文件/链接永不出工具，role-and-permission-matrix.md §2『跨 OEM 敏感图纸.展示』硬门槛，主管亦不展示）、R-4（凭证治理沿用教学模拟静态 Token）。设计沿用节点 ⑰ mes.lookup_production_record 既定模式：身份只来自可信会话、封闭字段枚举、用户面失败封套逐字节一致、只读零效果。",
+  "tool_binding": {
+    "tool_name": "plm.lookup_engineering_record",
+    "version": "1",
+    "effect": "read_only",
+    "server_identity": "sunroof-plm-server@local",
+    "external_write_effects": 0,
+    "fields_enum": ["bom_snapshot", "eco_history", "drawing_registry"],
+    "fields_min": 1,
+    "fields_max": 3,
+    "part_no_pattern": "^SR-[A-Z]{3,10}-[AB]\\d{2}$",
+    "eco": {
+      "max_return": 4,
+      "offset_max": 12
+    },
+    "error_taxonomy": ["invalid_argument", "not_available"],
+    "allowed_roles": ["pqe", "quality_supervisor"],
+    "trusted_context_keys": ["tenant", "user", "role", "allowed_projects"],
+    "acl": {
+      "pqe": "仅本项目组（allowed_oem_projects 下推，与 role-and-permission-matrix.md §2『PLM BOM/ECO.读取』一致）",
+      "quality_supervisor": "跨项目只读（[\"*\"]，矩阵 §2 ✓ 只读）",
+      "ops 及其他角色": "默认拒绝（Default-Deny）"
+    },
+    "data": {
+      "synthetic": true,
+      "source": "mcptool/plm_store.py 确定性合成夹具（零真实 PLM，全静态字面量零随机零时钟）"
+    }
+  },
+  "http_face": {
+    "endpoint": "POST /api/v1/plm/engineering-record",
+    "auth": "X-Auth-Token（服务端可信会话；请求体自报身份/未知字段一律 422）",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["part_no", "fields"],
+    "properties": {
+      "part_no": {
+        "type": "string",
+        "pattern": "^SR-[A-Z]{3,10}-[AB]\\d{2}$",
+        "description": "天窗零件号（教学格式，封闭语法不归一化）"
+      },
+      "fields": {
+        "type": "array",
+        "items": { "enum": ["bom_snapshot", "eco_history", "drawing_registry"] },
+        "minItems": 1,
+        "maxItems": 3,
+        "uniqueItems": true,
+        "description": "请求字段封闭枚举，1..3 个，不得重复"
+      },
+      "eco_offset": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 12,
+        "description": "ECO 历史分页偏移：缺省 0；每页最多 4 条（冻结上限），空窗合法返回空列表"
+      }
+    }
+  },
+  "eco_cap_resolution": "ECO 历史按冻结上限分页：每页最多 4 条（eco_offset 0..12），响应携带 total_changes/returned_changes/truncated/next_offset，任何 ECO 载荷永不超过单页上限 —— 不引入全量回传（与节点 ⑰ R-2 波形分页同一载料纪律）。",
+  "non_goals": [
+    "外部写效果恒 0（绝不创建返修单/隔离单/报废单，discovery-brief 非目标第 1 条）",
+    "图纸内容/文件/链接/渲染数据永不出工具（content_disclosure=denied_by_policy，P-1 跨 OEM 敏感图纸硬门槛，主管亦不展示）",
+    "跨项目组/未知件号/角色不足的用户面封套逐字节一致（零存在性泄漏，P-1）",
+    "字段缺失时返回结构化 not_available（reason_code=FIELD_NOT_AVAILABLE），绝不编造数据（P-3）"
+  ]
+}

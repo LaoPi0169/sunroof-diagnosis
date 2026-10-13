@@ -256,3 +256,43 @@ class MesLookupResponse(BaseModel):
     error: Optional[dict] = None
     business_effects: int = 0
 
+
+# ============================================================================
+# 阶段 C 节点 ⑱: PLM 工程记录查询 (只读 MCP 工具) DTO —— 回链 api-contract/
+# plm-lookup-v1.json 与 mcptool/plm_contract.py (封闭合同, 同值互锁;
+# discovery-brief-v1.md In-Scope 第 2 条 PLM 半边的阶段 C 兑现)。
+# ============================================================================
+
+
+class PLMField(str, Enum):
+    """PLM 查询字段封闭枚举 (与 mcptool.plm_contract.FIELD_ENUM 同值)"""
+    BOM_SNAPSHOT = "bom_snapshot"
+    ECO_HISTORY = "eco_history"
+    DRAWING_REGISTRY = "drawing_registry"
+
+
+class PLMLookupRequest(BaseModel):
+    """PLM 查询请求 Schema (封闭契约: 自报 role/身份等未知字段直接 422)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    part_no: str = Field(..., pattern=r"^SR-[A-Z]{3,10}-[AB]\d{2}$",
+                         description="天窗零件号 (冻结语法 ^SR-[A-Z]{3,10}-[AB]\\d{2}$, 教学格式)")
+    fields: List[PLMField] = Field(..., min_length=1, max_length=3,
+                                   description="请求字段封闭枚举, 1..3 个 (重复由工具层 invalid_argument 拒绝)")
+    eco_offset: Optional[int] = Field(default=None, ge=0, le=12,
+                                      description="ECO 历史分页偏移: 缺省 0; 每页最多 4 条 (冻结上限)")
+
+
+class PLMLookupResponse(BaseModel):
+    """PLM 查询响应封套 (失败封套静态 —— 跨项目/未知件号/角色不足零存在性泄漏)"""
+
+    tool: str
+    version: str
+    effect: str
+    run_id: str
+    ok: bool
+    result: Optional[dict] = None
+    error: Optional[dict] = None
+    business_effects: int = 0
+

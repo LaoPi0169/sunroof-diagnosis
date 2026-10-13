@@ -166,3 +166,22 @@ python ci/run_local_ci.py
   `ROOF-20001`（跨项目，默认 OEM-A 身份下零泄漏拒绝）；
 - 诚实边界：MES 为确定性合成夹具（synthetic=true，零真实 MES 连接），外部写
   效果恒 0（effect=read_only）。工具契约冻结于 `api-contract/mes-lookup-v1.json`。
+
+
+## 10. 节点 ⑱ 追加（2026-10-13）：PLM 工程记录查询面板
+
+第五面板「⑤ PLM 工程记录查询」对接只读 MCP 工具 `plm.lookup_engineering_record@1`
+（`POST /api/v1/plm/engineering-record`，身份仍走 §2 同一 `X-Auth-Token` 矩阵）：
+
+- 输入：零件号（冻结语法 `^SR-[A-Z]{3,10}-[AB]\d{2}$`，不归一化）+ 请求字段复选
+  （`bom_snapshot` / `eco_history` / `drawing_registry`，1..3 个）+ ECO 分页偏移
+  （0..12，留空按 0）；
+- 输出：BOM 快照（revision / count / items 表格）、ECO 历史（4 条/页，截断时显示
+  next_offset）、图纸登记元数据表格 + `content_disclosure=denied_by_policy` 提示
+  （图纸内容/文件/链接永不出工具，主管亦不展示——矩阵 §2 跨 OEM 敏感图纸硬门槛）；
+- `not_available` 字段（如 `SR-MOTOR-A02` 无图纸登记）显示字段级结构化缺失
+  （`FIELD_NOT_AVAILABLE`），绝不编造数值（P-3）；
+- 试玩样例：`SR-FRAME-A01`（本项目组全字段，6 条 ECO 可翻页）/ `SR-MOTOR-A02`
+  （图纸字段结构化缺失）/ `SR-RAIL-B01`（跨项目，默认 OEM-A 身份下零泄漏拒绝）；
+- 诚实边界：PLM 为确定性合成夹具（synthetic=true，零真实 PLM 连接），外部写
+  效果恒 0（effect=read_only）。工具契约冻结于 `api-contract/plm-lookup-v1.json`。
