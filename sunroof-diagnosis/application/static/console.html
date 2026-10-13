@@ -52,7 +52,7 @@ h3{margin:4px 0 10px;font-size:15px}
 <body>
 <header>
   <h1>天窗总成只读诊断 · 交互控制台</h1>
-  <span class="sub">阶段 C 节点 ⑮+⑰+⑱ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
+  <span class="sub">阶段 C 节点 ⑮+⑰+⑱+⑲+⑳ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
   <span style="margin-left:auto"><span class="dot" id="health-dot"></span> <span class="sub" id="health-text">健康检查中…</span></span>
 </header>
 <main>
@@ -80,6 +80,8 @@ h3{margin:4px 0 10px;font-size:15px}
     <button data-tab="tasks">③ 任务工作台（双角色闭环）</button>
     <button data-tab="mes">④ MES 生产记录抓取（只读 MCP · 节点 ⑰）</button>
     <button data-tab="plm">⑤ PLM 工程记录查询（只读 MCP · 节点 ⑱）</button>
+    <button data-tab="qms">⑥ QMS 检验标准查询（只读 MCP · 节点 ⑲）</button>
+    <button data-tab="report">⑦ 根因分析报告草稿（只读聚合 · 节点 ⑳）</button>
   </div>
   <div class="panel active" id="panel-rag">
     <div class="card">
@@ -173,6 +175,44 @@ h3{margin:4px 0 10px;font-size:15px}
       </div>
       <div id="plm-out" style="margin-top:12px"></div>
       <p class="muted">只读 MCP 工具 <code>plm.lookup_engineering_record@1</code>（effect=read_only，外部写效果恒 0；ECO 历史 4 条/页冻结上限，绝不全量回传；图纸只回登记元数据，content_disclosure=denied_by_policy —— 图纸内容/文件/链接永不出工具，矩阵 §2 跨 OEM 敏感图纸硬门槛，主管亦不展示）。默认身份 ACL 为 OEM-A：SR-FRAME-A01 / SR-GLASS-A01 / SR-MOTOR-A02 可见（MOTOR-A02 无图纸登记 → 字段级结构化缺失 P-3；FRAME-A01 有 6 条 ECO → 分页演示）；跨项目件号（SR-RAIL-B01）与未知件号返回完全一致的 not_available 封套（零存在性泄漏 P-1）。PLM 为确定性合成夹具（synthetic=true）。</p>
+    </div>
+  </div>
+  <div class="panel" id="panel-qms">
+    <div class="card">
+      <div class="row">
+        <div><label>零件号（冻结语法 SR-…-A01/B01）</label><input id="qms-part" size="16" value="SR-FRAME-A01"></div>
+        <div><label>工序（封闭枚举）</label>
+          <select id="qms-step">
+            <option value="torque_tightening">torque_tightening（扭矩复紧）</option>
+            <option value="gap_check">gap_check（间隙检查）</option>
+          </select>
+        </div>
+        <div style="min-width:300px"><label>请求字段（1..3 个）</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="qms-f-sop" checked> sop_current</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="qms-f-qs" checked> quality_standard</label>
+          <label style="display:inline-block"><input type="checkbox" id="qms-f-chk" checked> inspection_checklist</label>
+        </div>
+        <div><button id="btn-qms">查询检验标准</button></div>
+      </div>
+      <div id="qms-out" style="margin-top:12px"></div>
+      <p class="muted">只读 MCP 工具 <code>qms.lookup_inspection_standard@1</code>（effect=read_only，外部写效果恒 0；P-2 硬门槛：被替代 SOP/质量标准行在取数层被排除，绝不引用过期版本，payload 携带 exclusion_policy=current_only）。默认身份 ACL 为 OEM-A：SR-FRAME-A01（现行 SOP v5 + 质量标准 v2 + 3 步要点）可查；SR-MOTOR-A02 仅存被替代行 → 字段级结构化拒引 NO_CURRENT_SOP（P-2）；MOTOR-A02 无检验要点 → FIELD_NOT_AVAILABLE（P-3）；工序选 gap_check 查 FRAME-A01 → 该工序无行 → FIELD_NOT_AVAILABLE。跨项目件号（SR-RAIL-B01）与未知件号返回完全一致的 not_available 封套（零存在性泄漏 P-1）。QMS 为确定性合成夹具（synthetic=true）。</p>
+    </div>
+  </div>
+  <div class="panel" id="panel-report">
+    <div class="card">
+      <div class="row">
+        <div><label>天窗总成 SN（冻结语法 ROOF-#####）</label><input id="rep-sn" size="14" value="ROOF-10001"></div>
+        <div><label>零件号（与 QMS/PLM 同值）</label><input id="rep-part" size="16" value="SR-FRAME-A01"></div>
+        <div><label>聚焦工序</label>
+          <select id="rep-step">
+            <option value="torque_tightening">torque_tightening（扭矩复紧）</option>
+            <option value="gap_check">gap_check（间隙检查）</option>
+          </select>
+        </div>
+        <div><button id="btn-report">生成报告草稿</button></div>
+      </div>
+      <div id="report-out" style="margin-top:12px"></div>
+      <p class="muted">只读聚合 MCP 工具 <code>report.draft_root_cause@1</code>（服务端内部只读聚合 MES ⑰ + QMS ⑲ + PLM ⑱，同一可信上下文透传；偏差计算 100% 确定性可复算：公差带判定 + 15% 硬限转人工）。试玩矩阵：ROOF-10001 + SR-FRAME-A01 → draft_ready（frame_bolt 偏差 +1.26% conforming；rail_bolt 无对接标准 → 结构化 gap）；ROOF-10003 + SR-FRAME-A01 → needs_review/SPEC_HARD_LIMIT_EXCEEDED（+15.58% 超硬限）；SR-MOTOR-A02 → needs_review/NO_CURRENT_SOP（P-2 贯通）。波形绝不嵌入报告（R-2 载料纪律，OMITTED gap 指向 MES 工具分页取数）。draft_ready = 「依据充分、可出具带引用草稿」，不是「合格判定」；跨项目组合任一源拒绝 → 整体封套一致（零存在性泄漏 P-1）。</p>
     </div>
   </div>
 </main>
@@ -450,6 +490,135 @@ $id('btn-plm').onclick=function(){
     Object.keys(fs).forEach(function(k){parts.push(plmFieldCard(k,fs[k]))});
     parts.push('</div>');
     $id('plm-out').innerHTML=parts.join('');
+  });
+};
+
+/* ---------- ⑥ QMS 检验标准查询 (节点 ⑲ · 只读 MCP) ---------- */
+function qmsFields(){
+  var fs=[];
+  if($id('qms-f-sop').checked){fs.push('sop_current')}
+  if($id('qms-f-qs').checked){fs.push('quality_standard')}
+  if($id('qms-f-chk').checked){fs.push('inspection_checklist')}
+  return fs;
+}
+function qmsFieldCard(name,entry){
+  if(entry.status!=='available'){
+    return '<p>· <code>'+esc(name)+'</code> <span class="badge needs_review">not_available</span>'
+      +' <span class="muted">reason_code='+esc(entry.reason_code||'')+'（结构化缺失, 绝不编造/拒引过期）</span></p>';
+  }
+  var p=entry.payload;
+  if(name==='sop_current'){
+    return '<p>· <code>'+esc(name)+'</code>（现行检验规程）</p><dl class="kv">'
+      +kv('SOP 编号',esc(p.sop_id))+kv('现行版本',esc(p.version))
+      +kv('标题',esc(p.title))+kv('生效日',esc(p.effective_at))
+      +kv('责任 owner',esc(p.owner_id))+kv('对接工序',esc(p.process_step))
+      +kv('MES 对接键',esc(p.mes_step))
+      +kv('取数纪律',esc(p.exclusion_policy))+'</dl>';
+  }
+  if(name==='quality_standard'){
+    return '<p>· <code>'+esc(name)+'</code>（现行质量标准）</p><dl class="kv">'
+      +kv('标准编号',esc(p.spec_id))+kv('版本',esc(p.version))
+      +kv('单位',esc(p.unit))+kv('目标值',p.target_value)
+      +kv('公差带',esc(p.tolerance))+kv('公式规则',esc(p.formula_rule))
+      +kv('出处引用',esc(p.source_ref))+kv('MES 对接键',esc(p.mes_step))
+      +kv('取数纪律',esc(p.exclusion_policy))+'</dl>';
+  }
+  var rows=(p.items||[]).map(function(r){
+    return '<tr><td>'+esc(r.step_no)+'</td><td>'+esc(r.action)+'</td></tr>';
+  }).join('');
+  return '<p>· <code>'+esc(name)+'</code>（'+p.count+' 步检验要点 · MES 对接键 '+esc(p.mes_step)
+    +' · 取数纪律 '+esc(p.exclusion_policy)+'）</p>'
+    +'<table><thead><tr><th>步骤</th><th>要点</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+$id('btn-qms').onclick=function(){
+  var body={part_no:$id('qms-part').value.trim(),process_step:$id('qms-step').value,fields:qmsFields()};
+  $id('qms-out').innerHTML='<p class="muted">查询中…</p>';
+  api('POST','/api/v1/qms/inspection-standard',body,function(err,j){
+    if(err){$id('qms-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    if(!j.ok){
+      $id('qms-out').innerHTML='<div class="card"><p>'+badge('denied')
+        +' <span class="muted">error.code='+esc((j.error||{}).code)+' · run_id='+esc(j.run_id)
+        +' · business_effects='+j.business_effects+'</span></p>'
+        +'<p class="muted">跨项目组 / 未知件号 / 角色不足三者封套完全一致（零存在性泄漏）；细分原因只进服务端受限审计。</p></div>';
+      return;
+    }
+    var r=j.result||{},parts=['<div class="card"><p><span class="badge answered">available</span>'
+      +' <span class="muted">part_no='+esc(r.part_no)+' · process_step='+esc(r.process_step)
+      +' · oem_project='+esc(r.oem_project)+' · tool='+esc(j.tool)+'@'+esc(j.version)
+      +' · effect='+esc(j.effect)+' · run_id='+esc(j.run_id)
+      +' · business_effects='+j.business_effects+'</span></p>'];
+    var fs=r.fields||{};
+    Object.keys(fs).forEach(function(k){parts.push(qmsFieldCard(k,fs[k]))});
+    parts.push('</div>');
+    $id('qms-out').innerHTML=parts.join('');
+  });
+};
+
+/* ---------- ⑦ 根因分析报告草稿 (节点 ⑳ · 只读聚合 MCP) ---------- */
+var TOPIC_ZH={assembly_torque_deviation:'装配扭矩偏差（确定性复算）',ecu_flash:'ECU 刷写档案',
+  current_sop:'现行检验 SOP',inspection_checklist:'检验要点清单',
+  bom_revision:'BOM 版本',engineering_change:'工程变更（ECO）'};
+function renderFinding(f){
+  if(f.topic==='assembly_torque_deviation'){
+    return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'<br><span class="muted">'+esc(f.step)+'</span></td>'
+      +'<td>'+f.measured_nm+' vs '+f.target_nm+'（公差 '+esc(f.tolerance)+'）'
+      +'<br>偏差 <strong>'+(f.deviation_pct>0?'+':'')+f.deviation_pct+'%</strong>（'+f.deviation_nm+' N·m） · '
+      +'<span class="badge '+(f.conformance==='conforming'?'answered':'needs_review')+'">'+esc(f.conformance)+'</span></td>'
+      +'<td class="muted">'+esc(f.citation)+'<br><span class="muted">'+esc(f.formula_rule)+'</span></td></tr>';
+  }
+  if(f.topic==='ecu_flash'){
+    return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'</td><td>'+esc(f.ecu_part_no)+' · '+esc(f.sw_version)+' · 标定 '+esc(f.calib_set)+'</td>'
+      +'<td class="muted">'+esc(f.citation)+'</td></tr>';
+  }
+  if(f.topic==='current_sop'){
+    return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'</td><td>'+esc(f.sop_id)+' @ '+esc(f.version)+'（生效 '+esc(f.effective_at)+'）</td>'
+      +'<td class="muted">'+esc(f.citation)+'</td></tr>';
+  }
+  if(f.topic==='inspection_checklist'){
+    return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'</td><td>'+f.count+' 步 · '+esc((f.step_no||[]).join(' / '))+'</td>'
+      +'<td class="muted">'+esc(f.citation)+'</td></tr>';
+  }
+  if(f.topic==='bom_revision'){
+    return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'</td><td>版本 '+esc(f.revision)+' · '+f.component_count+' 部件</td>'
+      +'<td class="muted">'+esc(f.citation)+'</td></tr>';
+  }
+  return '<tr><td>'+esc(TOPIC_ZH[f.topic]||f.topic)+'</td><td>累计 '+f.total_changes+' 条变更 · 最近 '+esc(f.latest_eco_id||'—')
+    +(f.latest_effective_at?'（生效 '+esc(f.latest_effective_at)+'）':'')+'</td>'
+    +'<td class="muted">'+esc(f.citation)+'</td></tr>';
+}
+$id('btn-report').onclick=function(){
+  var body={sn:$id('rep-sn').value.trim(),part_no:$id('rep-part').value.trim(),process_step:$id('rep-step').value};
+  $id('report-out').innerHTML='<p class="muted">聚合中…（MES ⑰ + QMS ⑲ + PLM ⑱ 只读三源, 确定性偏差复算）</p>';
+  api('POST','/api/v1/report/draft',body,function(err,j){
+    if(err){$id('report-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    if(!j.ok){
+      $id('report-out').innerHTML='<div class="card"><p>'+badge('denied')
+        +' <span class="muted">error.code='+esc((j.error||{}).code)+' · run_id='+esc(j.run_id)
+        +' · business_effects='+j.business_effects+'</span></p>'
+        +'<p class="muted">任一源跨项目 / 未知 SN / 未知件号 / 角色不足 → 整体封套完全一致（零存在性泄漏）；细分原因只进服务端受限审计。</p></div>';
+      return;
+    }
+    var rep=(j.result||{}).report||{};
+    var fr=(rep.findings||[]).map(renderFinding).join('');
+    var gr=(rep.gaps||[]).map(function(g){
+      return '<tr><td>'+esc(g.topic)+(g.step?'<br><span class="muted">'+esc(g.step)+'</span>':'')+'</td>'
+        +'<td><span class="badge needs_review">'+esc(g.reason_code)+'</span>'+(g.note?'<br><span class="muted">'+esc(g.note)+'</span>':'')+'</td></tr>';
+    }).join('');
+    var cits=(rep.citations||[]).map(function(c){return '<code>'+esc(c)+'</code>'}).join(' ');
+    $id('report-out').innerHTML='<div class="card">'
+      +'<p>'+badge(rep.conclusion.status==='draft_ready'?'answered':'needs_review')
+      +' <strong>《天窗总成异常根因分析报告草稿》</strong>'
+      +' <span class="muted">SN='+esc(rep.case.sn)+' · 零件='+esc(rep.case.part_no)
+      +' · 工序='+esc(rep.case.process_step)+' · 项目组='+esc(rep.case.oem_project)
+      +' · tool='+esc(j.tool)+'@'+esc(j.version)+' · run_id='+esc(j.run_id)
+      +' · business_effects='+j.business_effects+'</span></p>'
+      +'<p>结论：<strong>'+esc(rep.conclusion.status)+'</strong>'
+      +(rep.conclusion.reason_code?' / <code>'+esc(rep.conclusion.reason_code)+'</code>':'')
+      +' <span class="muted">'+esc(rep.conclusion.note)+'</span></p>'
+      +(fr?'<table><thead><tr><th>发现</th><th>内容</th><th>出处引用</th></tr></thead><tbody>'+fr+'</tbody></table>':'')
+      +(gr?'<p style="margin-top:8px">结构化缺口（绝不编造）：</p><table><thead><tr><th>主题</th><th>原因</th></tr></thead><tbody>'+gr+'</tbody></table>':'')
+      +'<p style="margin-top:8px">引用清单：'+cits+'</p>'
+      +'<p class="muted">'+esc(rep.disclaimer)+'</p></div>';
   });
 };
 

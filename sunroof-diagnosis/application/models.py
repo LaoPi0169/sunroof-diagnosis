@@ -296,3 +296,76 @@ class PLMLookupResponse(BaseModel):
     error: Optional[dict] = None
     business_effects: int = 0
 
+
+# ============================================================================
+# 阶段 C 节点 ⑲: QMS 检验标准查询 (只读 MCP 工具) DTO —— 回链 api-contract/
+# qms-lookup-v1.json 与 mcptool/qms_contract.py (封闭合同, 同值互锁;
+# discovery-brief-v1.md In-Scope 第 2 条 QMS 半边的阶段 C 兑现, P-2 现行过滤)。
+# ============================================================================
+
+
+class QMSField(str, Enum):
+    """QMS 查询字段封闭枚举 (与 mcptool.qms_contract.FIELD_ENUM 同值)"""
+    SOP_CURRENT = "sop_current"
+    QUALITY_STANDARD = "quality_standard"
+    INSPECTION_CHECKLIST = "inspection_checklist"
+
+
+class QMSLookupRequest(BaseModel):
+    """QMS 查询请求 Schema (封闭契约: 自报 role/身份等未知字段直接 422)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    part_no: str = Field(..., pattern=r"^SR-[A-Z]{3,10}-[AB]\d{2}$",
+                         description="天窗零件号 (冻结语法, 教学格式)")
+    process_step: str = Field(..., pattern=r"^(torque_tightening|gap_check)$",
+                              description="工序封闭枚举 (specs/data-contract-v1.md 计量约定)")
+    fields: List[QMSField] = Field(..., min_length=1, max_length=3,
+                                   description="请求字段封闭枚举, 1..3 个 (重复由工具层 invalid_argument 拒绝)")
+
+
+class QMSLookupResponse(BaseModel):
+    """QMS 查询响应封套 (失败封套静态 —— 跨项目/未知件号/角色不足零存在性泄漏)"""
+
+    tool: str
+    version: str
+    effect: str
+    run_id: str
+    ok: bool
+    result: Optional[dict] = None
+    error: Optional[dict] = None
+    business_effects: int = 0
+
+
+# ============================================================================
+# 阶段 C 节点 ⑳: 根因分析报告草稿 (只读聚合 MCP 工具) DTO —— 回链 api-contract/
+# report-draft-v1.json 与 mcptool/report_contract.py (封闭合同, 同值互锁;
+# discovery-brief-v1.md In-Scope 第 3 条的阶段 C 兑现: 结构化带出处引用草稿)。
+# ============================================================================
+
+
+class ReportDraftRequest(BaseModel):
+    """报告草稿请求 Schema (封闭契约: 自报 role/身份等未知字段直接 422)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sn: str = Field(..., pattern=r"^ROOF-\d{5}$",
+                    description="天窗总成 SN (与 MES 合同同值, 冻结语法)")
+    part_no: str = Field(..., pattern=r"^SR-[A-Z]{3,10}-[AB]\d{2}$",
+                         description="天窗零件号 (与 QMS/PLM 合同同值, 冻结语法)")
+    process_step: str = Field(..., pattern=r"^(torque_tightening|gap_check)$",
+                              description="聚焦工序 (封闭枚举)")
+
+
+class ReportDraftResponse(BaseModel):
+    """报告草稿响应封套 (失败封套静态 —— 三因一致零存在性泄漏)"""
+
+    tool: str
+    version: str
+    effect: str
+    run_id: str
+    ok: bool
+    result: Optional[dict] = None
+    error: Optional[dict] = None
+    business_effects: int = 0
+

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "report-draft-v1",
+  "title": "report.draft_root_cause@1 只读聚合 MCP 工具契约（阶段 C 节点 ⑳ 冻结）",
+  "description": "回链 specs/discovery-brief-v1.md In-Scope 第 3 条（输出结构化、带出处引用的《天窗总成异常根因分析报告草稿》）。服务端内部只读聚合 MES ⑰（装配扭矩/ECU 刷写）+ QMS ⑲（现行 SOP/质量标准）+ PLM ⑱（BOM/ECO），偏差计算 100% 确定性可复算（measured vs 现行质量标准，公差带判定 + 15% 硬限转人工），零 LLM、零时钟、零随机（同输入同输出）。设计沿用节点 ⑰⑱⑲ 只读工具既定模式：身份只来自可信会话、用户面失败封套逐字节一致、只读零效果。",
+  "tool_binding": {
+    "tool_name": "report.draft_root_cause",
+    "version": "1",
+    "effect": "read_only",
+    "server_identity": "sunroof-report-server@local",
+    "external_write_effects": 0,
+    "sn_pattern": "^ROOF-\\d{5}$",
+    "part_no_pattern": "^SR-[A-Z]{3,10}-[AB]\\d{2}$",
+    "process_step_enum": ["torque_tightening", "gap_check"],
+    "hard_limit_pct": 15.0,
+    "hard_limit_reason_code": "SPEC_HARD_LIMIT_EXCEEDED",
+    "conclusion_enum": ["draft_ready", "needs_review"],
+    "gap_reason_codes": ["FIELD_NOT_AVAILABLE", "NO_CURRENT_SOP", "NO_STANDARD_FOR_STEP", "OMITTED_BY_R2_PAGINATION_CONTRACT"],
+    "aggregates": ["mes.lookup_production_record@1", "qms.lookup_inspection_standard@1", "plm.lookup_engineering_record@1"],
+    "error_taxonomy": ["invalid_argument", "not_available"],
+    "allowed_roles": ["pqe", "quality_supervisor"],
+    "trusted_context_keys": ["tenant", "user", "role", "allowed_projects"],
+    "acl": {
+      "pqe": "三源同 ACL（任一源跨项目拒绝则整体封套一致拒绝，零存在性泄漏）",
+      "quality_supervisor": "跨项目只读（[\"*\"]）",
+      "ops 及其他角色": "默认拒绝（Default-Deny）"
+    },
+    "data": {
+      "synthetic": true,
+      "source": "三源 store（mes_store/qms_store/plm_store）确定性合成夹具聚合，聚合引擎 report_aggregate.py 零状态"
+    }
+  },
+  "http_face": {
+    "endpoint": "POST /api/v1/report/draft",
+    "auth": "X-Auth-Token（服务端可信会话；请求体自报身份/未知字段一律 422）",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["sn", "part_no", "process_step"],
+    "properties": {
+      "sn": {
+        "type": "string",
+        "pattern": "^ROOF-\\d{5}$",
+        "description": "天窗总成 SN（与 MES 合同同值，冻结语法不归一化）"
+      },
+      "part_no": {
+        "type": "string",
+        "pattern": "^SR-[A-Z]{3,10}-[AB]\\d{2}$",
+        "description": "天窗零件号（与 QMS/PLM 合同同值，冻结语法不归一化）"
+      },
+      "process_step": {
+        "type": "string",
+        "enum": ["torque_tightening", "gap_check"],
+        "description": "聚焦工序（封闭枚举）"
+      }
+    }
+  },
+  "r2_waveform_resolution": "传感器波形绝不嵌入报告载荷（R-2 载料纪律：128 点全量回传被冻结分页契约禁止）：报告以结构化 gap（reason_code=OMITTED_BY_R2_PAGINATION_CONTRACT）登记波形可用性并指向 MES 工具分页取数；响应体零波形点列（测试断言）。",
+  "draft_semantics": "draft_ready = 「依据充分、可出具带引用的草稿」，不是「合格判定」；报告仅供 PQE 参考核对（静态 disclaimer）。确定性结论规则：任一偏差超 15% 硬限 → needs_review/SPEC_HARD_LIMIT_EXCEEDED；无现行 SOP → needs_review/NO_CURRENT_SOP；否则 draft_ready。",
+  "non_goals": [
+    "外部写效果恒 0（绝不创建返修单/隔离单/报废单，也绝不自动向主机厂发送 8D 报告，discovery-brief 非目标第 1/2 条）",
+    "零大模型调用（确定性规则聚合 + 可复算偏差计算，generator 无 LLM 通路）",
+    "任一源跨项目/未知 SN/未知件号/角色不足 -> 整体用户面封套逐字节一致（零存在性泄漏，P-1）",
+    "缺失/冲突/无现行标准时结构化 gap，绝不编造数据（P-3/P-2 贯通）"
+  ]
+}

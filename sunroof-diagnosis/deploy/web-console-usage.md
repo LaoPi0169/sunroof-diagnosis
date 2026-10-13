@@ -185,3 +185,46 @@ python ci/run_local_ci.py
   （图纸字段结构化缺失）/ `SR-RAIL-B01`（跨项目，默认 OEM-A 身份下零泄漏拒绝）；
 - 诚实边界：PLM 为确定性合成夹具（synthetic=true，零真实 PLM 连接），外部写
   效果恒 0（effect=read_only）。工具契约冻结于 `api-contract/plm-lookup-v1.json`。
+
+
+## 11. 节点 ⑲ 追加（2026-10-13）：QMS 检验标准查询面板
+
+第六面板「⑥ QMS 检验标准查询」对接只读 MCP 工具 `qms.lookup_inspection_standard@1`
+（`POST /api/v1/qms/inspection-standard`，身份仍走 §2 同一 `X-Auth-Token` 矩阵）：
+
+- 输入：零件号（冻结语法 `^SR-[A-Z]{3,10}-[AB]\d{2}$`）+ 工序封闭枚举
+  （`torque_tightening` / `gap_check`）+ 请求字段复选（`sop_current` /
+  `quality_standard` / `inspection_checklist`，1..3 个）；
+- 输出：现行检验 SOP（编号/版本/生效日/对接键）、现行质量标准（spec_id/单位/
+  目标值/公差带/公式规则/出处引用 source_ref）、检验要点清单（分步表格）；
+- **P-2 硬门槛**：被替代 SOP/质量标准行在取数层被排除（is_current=1 语义），
+  被替代版本标识永不出响应；仅存被替代行时字段级结构化拒引
+  `NO_CURRENT_SOP`；
+- `FIELD_NOT_AVAILABLE`（工序无行/清单缺失）为字段级结构化缺失，绝不编造（P-3）；
+- 试玩样例：`SR-FRAME-A01` + `torque_tightening`（全字段现行版）/ `SR-MOTOR-A02`
+  （sop 与质量标准 NO_CURRENT_SOP、清单 FIELD_NOT_AVAILABLE）/
+  `SR-RAIL-B01`（跨项目，默认 OEM-A 身份下零泄漏拒绝）；
+- 诚实边界：QMS 为确定性合成夹具（synthetic=true，零真实 QMS 连接），外部写
+  效果恒 0（effect=read_only）。工具契约冻结于 `api-contract/qms-lookup-v1.json`。
+
+
+## 12. 节点 ⑳ 追加（2026-10-13）：根因分析报告草稿面板
+
+第七面板「⑦ 根因分析报告草稿」对接只读聚合 MCP 工具 `report.draft_root_cause@1`
+（`POST /api/v1/report/draft`，身份仍走 §2 同一 `X-Auth-Token` 矩阵）——
+discovery-brief In-Scope 第 3 条（结构化、带出处引用的报告草稿）的阶段 C 兑现：
+
+- 输入：SN（`ROOF-#####`）+ 零件号 + 聚焦工序三键；
+- 输出：结论徽标（`draft_ready` / `needs_review` + 原因码）+ 发现表
+  （扭矩偏差确定性复算 / ECU 档案 / 现行 SOP / 检验要点 / BOM 版本 / ECO，
+  每条带出处引用）+ 结构化缺口表 + 引用清单 + 静态免责声明；
+- 偏差计算 100% 可复算（measured vs 现行质量标准，公差带判定 + 15% 硬限）；
+- 试玩矩阵：`ROOF-10001` + `SR-FRAME-A01` → `draft_ready`（frame_bolt
+  +1.26% conforming；rail_bolt 无对接标准 → 结构化 gap）；`ROOF-10003` +
+  `SR-FRAME-A01` → `needs_review/SPEC_HARD_LIMIT_EXCEEDED`（+15.58% 超硬限）；
+  `SR-MOTOR-A02` → `needs_review/NO_CURRENT_SOP`（P-2 贯通）；
+- 波形绝不嵌入报告（R-2 载料纪律，`OMITTED_BY_R2_PAGINATION_CONTRACT` gap
+  指向 MES 工具分页取数）；任一源拒绝 → 整体封套一致（零存在性泄漏 P-1）；
+- 诚实边界：草稿为确定性规则聚合（零 LLM、零时钟零随机），`draft_ready` 是
+  「依据充分、可出具带引用草稿」而非「合格判定」；工具契约冻结于
+  `api-contract/report-draft-v1.json`；最终用户操作手册见 `deploy/USER-GUIDE.md`。

@@ -70,6 +70,14 @@ SCOPE_FILES = [
     os.path.join("mcptool", "plm_contract.py"),
     os.path.join("mcptool", "plm_store.py"),
     os.path.join("mcptool", "plm_server.py"),
+    os.path.join("mcptool", "qms_contract.py"),
+    os.path.join("mcptool", "qms_store.py"),
+    os.path.join("mcptool", "qms_server.py"),
+    os.path.join("application", "qms.py"),
+    os.path.join("mcptool", "report_contract.py"),
+    os.path.join("mcptool", "report_aggregate.py"),
+    os.path.join("mcptool", "report_server.py"),
+    os.path.join("application", "report.py"),
     os.path.join("workbench_handoff", "app.py"),
 ]
 

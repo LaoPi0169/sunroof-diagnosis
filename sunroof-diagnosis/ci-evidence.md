@@ -300,3 +300,61 @@ schema→RBAC→ACL→只读取数校验链; HTTP 面 `POST /api/v1/plm/engineer
   全部不动（本节点仅追加工具/端点/面板/扫描范围 +5 文件）。
 - 诚实边界: PLM 为确定性合成夹具（零真实 PLM 连接）; 凭证治理沿用教学模拟静态
   Token（R-4 口径不变, 上线前需按真实 SSO 重审权限矩阵）。
+
+
+## 12. 阶段 C 节点 ⑲ —— QMS 检验标准查询 · 只读 QMS MCP 工具（2026-10-13）
+
+discovery-brief-v1.md In-Scope 第 2 条的 QMS 半边兑现（阶段 C 真实集成第三步）。
+交付只读 MCP 工具 `qms.lookup_inspection_standard@1`: `mcptool/qms_contract.py`
+封闭合同（part_no 语法 + 工序封闭枚举 torque_tightening/gap_check）→
+`api-contract/qms-lookup-v1.json` 同值互锁（test_12 逐项断言）; `qms_store.py`
+确定性合成 QMS 夹具 4 件号（现行 SOP/质量标准/检验要点 + 被替代行显式保留）
+synthetic=true 零写入口; `qms_server.py` schema→RBAC→ACL→只读取数校验链;
+HTTP 面 `POST /api/v1/qms/inspection-standard`（application 仅追加）+ 控制台
+第六面板「QMS 检验标准查询」。
+
+保护指标落地:
+- **P-2 硬门槛（引用过期/已被替代 SOP = 0 次）**: store 中 is_current=0 的被替代
+  行在取数层被排除（SQL WHERE is_current=1 语义）; 被替代版本标识（旧版本号/
+  superseded_by/supersedes/is_current 治理键）永不出响应（test_02 禁词扫描）;
+  仅存被替代行时字段级结构化拒引 reason_code=NO_CURRENT_SOP（SR-MOTOR-A02,
+  test_10）; payload 携带 exclusion_policy=current_only 取数纪律标记。
+- **P-1 零存在性泄漏**: 跨项目（SR-RAIL-B01）/ 未知件号 / 角色不足三因用户面
+  封套逐字节一致, 细分原因只进受限审计, external_effects 恒 0。
+- **P-3**: 字段行完全缺失 → FIELD_NOT_AVAILABLE（MOTOR-A02 无检验要点 /
+  FRAME-A01 gap_check 工序无行）, 绝不编造。
+
+本地四阶段 CI（节点 ⑲⑳ 代码基线）:
+- STAGE-1-schema PASS; **STAGE-2-unittest PASS（Ran 139 tests in 23.982s, exit=0
+  —— 113 存量 + 26 新增）**; STAGE-3-redaction PASS（**48 文件** / 54 出射点 /
+  violations=0, 扫描范围 +8 文件）; STAGE-4-clean-env-smoke PASS（4/4）。
+- 证据日志: `evidence/ci-run-w19-20.log`。
+
+
+## 13. 阶段 C 节点 ⑳ —— 根因分析报告草稿 · 只读聚合 MCP 工具（2026-10-13）
+
+discovery-brief-v1.md In-Scope 第 3 条兑现（阶段 C 收官）: 结构化、带出处引用的
+《天窗总成异常根因分析报告草稿》。交付只读聚合 MCP 工具
+`report.draft_root_cause@1`: `mcptool/report_contract.py` 封闭合同（sn/part_no/
+process_step 三键, 与三源合同同值）→ `api-contract/report-draft-v1.json` 同值
+互锁（test_11 逐项断言）; `mcptool/report_aggregate.py` 零状态聚合引擎
+（服务端内部直调三源 server 层, 同一可信上下文透传; findings 带出处引用 /
+gaps 结构化绝不编造 / conclusion 确定性规则）; `report_server.py` 校验链;
+HTTP 面 `POST /api/v1/report/draft` + 控制台第七面板。
+
+保护指标与纪律落地:
+- **偏差 100% 确定性可复算**: measured vs 现行质量标准（mes_step 为 MES↔QMS
+  确定性对接键）—— 公差带判定 conformance + 15% 硬限转人工
+  （needs_review/SPEC_HARD_LIMIT_EXCEEDED, 与阶段 A spec-check 同值原因码;
+  test_02: 9.62→+1.26% conforming / 10.98→+15.58% nonconforming→needs_review）。
+- **P-2/P-3 贯通**: 无现行 SOP → gap + 结论 needs_review/NO_CURRENT_SOP;
+  无对接标准的拧紧工序 → NO_STANDARD_FOR_STEP; 缺失字段 → 结构化 gap。
+- **R-2 载料纪律**: 波形绝不嵌入报告载荷（OMITTED_BY_R2_PAGINATION_CONTRACT
+  gap, 指向 MES 工具分页取数; test_09 断言响应零波形点列与载荷元数据键）。
+- **草稿语义**: draft_ready = 「依据充分、可出具带引用草稿」, 不是「合格判定」
+  （静态 disclaimer）; 零 LLM、零时钟、零随机（test_12 两次调用逐字节一致）。
+- **只读性质**: 三源 store 指纹前后逐字节一致（test_10）; nested 审计三源分型
+  （mes./qms./plm. 条目并入受限审计, 主条目 reason_typed=source_unavailable:源
+  精确分型）。
+- 阶段 C 收官: discovery-brief In-Scope 1/2/3 全部兑现（⑰ MES 抓取 + ⑱ PLM +
+  ⑲ QMS + ⑳ 报告草稿）; 冻结面零改动（仅追加工具/端点/面板/扫描范围 +8 文件）。

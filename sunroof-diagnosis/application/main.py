@@ -20,8 +20,12 @@ from application.models import (
     MesLookupResponse,
     PLMLookupRequest,
     PLMLookupResponse,
+    QMSLookupRequest,
+    QMSLookupResponse,
     RagAnswerRequest,
     RagAnswerResponse,
+    ReportDraftRequest,
+    ReportDraftResponse,
     SessionIdentity,
     SpecCheckRequest,
     SpecCheckResponse,
@@ -31,6 +35,8 @@ from application.models import (
 )
 from application import mes as mes_gateway
 from application import plm as plm_gateway
+from application import qms as qms_gateway
+from application import report as report_gateway
 from application.rag import answer_query, corpus_meta
 from application.services import process_spec_check
 from application.tasks import process_task_action
@@ -233,3 +239,71 @@ def plm_engineering_record_endpoint(
         request.part_no, [f.value for f in request.fields], request.eco_offset,
         trusted_user)
     return PLMLookupResponse(**record)
+
+
+# ============================================================================
+# 阶段 C 节点 ⑲: QMS 检验标准查询 HTTP 面 (只读 MCP 工具)
+# discovery-brief-v1.md In-Scope 第 2 条 QMS 半边的阶段 C 兑现; P-2 硬门槛:
+# 被替代 SOP/质量标准行在工具取数层被排除 (is_current=1 语义), 绝不引用过期版本
+# (api-contract/qms-lookup-v1.json)。
+# ============================================================================
+
+
+@app.post(
+    "/api/v1/qms/inspection-standard",
+    response_model=QMSLookupResponse,
+    summary="按零件号+工序只读查询 QMS 现行检验标准 (现行 SOP/质量标准/检验要点, 只读 MCP)",
+    status_code=status.HTTP_200_OK,
+)
+def qms_inspection_standard_endpoint(
+    request: QMSLookupRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> QMSLookupResponse:
+    """
+    把 mcptool qms.lookup_inspection_standard@1 以 HTTP 形式追加暴露 (仅追加能力):
+    * 身份只来自服务端可信会话 (X-Auth-Token); 跨项目/未知件号/角色不足三者
+      用户面封套逐字节一致 (零存在性泄漏, P-1), 细分原因只进受限审计;
+    * P-2: 仅放行 is_current=1 的现行行, 被替代版本标识永不出现在响应;
+      仅存在被替代行时字段级结构化 not_available (reason_code=NO_CURRENT_SOP);
+    * 字段缺失返回字段级结构化 not_available, 绝不编造数据 (P-3);
+    * 零业务写副作用 (effect=read_only, business_effects 恒 0)。
+    """
+    record = qms_gateway.lookup_inspection_standard(
+        request.part_no, request.process_step, [f.value for f in request.fields],
+        trusted_user)
+    return QMSLookupResponse(**record)
+
+
+# ============================================================================
+# 阶段 C 节点 ⑳: 根因分析报告草稿 HTTP 面 (只读聚合 MCP 工具)
+# discovery-brief-v1.md In-Scope 第 3 条的阶段 C 兑现: 结构化、带出处引用的
+# 《天窗总成异常根因分析报告草稿》—— 服务端内部只读聚合 MES ⑰ + QMS ⑲ +
+# PLM ⑱, 确定性偏差计算 (100% 可复算), 波形绝不嵌入 (R-2 载料纪律)。
+# ============================================================================
+
+
+@app.post(
+    "/api/v1/report/draft",
+    response_model=ReportDraftResponse,
+    summary="生成《天窗总成异常根因分析报告草稿》(只读聚合 MES+QMS+PLM, 确定性偏差计算)",
+    status_code=status.HTTP_200_OK,
+)
+def report_draft_endpoint(
+    request: ReportDraftRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> ReportDraftResponse:
+    """
+    把 mcptool report.draft_root_cause@1 以 HTTP 形式追加暴露 (仅追加能力):
+    * 身份只来自服务端可信会话 (X-Auth-Token); 任一源跨项目/未知 SN/未知件号/
+      角色不足 -> 整体封套逐字节一致 (零存在性泄漏, P-1), 细分原因只进受限审计;
+    * 聚合只读三源 (同一可信上下文透传, 三源各自完整校验链); 偏差计算确定性
+      (measured vs 现行质量标准, 公差带 + 15% 硬限), 超限转人工
+      (needs_review/SPEC_HARD_LIMIT_EXCEEDED, 与阶段 A 同值原因码);
+    * P-2/P-3 贯通: 无现行 SOP -> gap 转人工; 缺失字段 -> 结构化 gap, 绝不编造;
+    * 传感器波形绝不嵌入报告载荷 (R-2 载料纪律, 结构化 OMITTED gap);
+    * 草稿仅供 PQE 参考核对 (draft_ready ≠ 合格判定); 零业务写副作用
+      (effect=read_only, business_effects 恒 0)。
+    """
+    record = report_gateway.draft_root_cause(
+        request.sn, request.part_no, request.process_step, trusted_user)
+    return ReportDraftResponse(**record)
