@@ -52,7 +52,7 @@ h3{margin:4px 0 10px;font-size:15px}
 <body>
 <header>
   <h1>天窗总成只读诊断 · 交互控制台</h1>
-  <span class="sub">阶段 C 节点 ⑮ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
+  <span class="sub">阶段 C 节点 ⑮+⑰ · FastAPI API 网关面 · 零 LLM / 零业务写副作用</span>
   <span style="margin-left:auto"><span class="dot" id="health-dot"></span> <span class="sub" id="health-text">健康检查中…</span></span>
 </header>
 <main>
@@ -78,6 +78,7 @@ h3{margin:4px 0 10px;font-size:15px}
     <button data-tab="rag" class="active">① 只读 RAG 问答（Week-12 门控决策树）</button>
     <button data-tab="spec">② 装配规格核对（确定性引擎）</button>
     <button data-tab="tasks">③ 任务工作台（双角色闭环）</button>
+    <button data-tab="mes">④ MES 生产记录抓取（只读 MCP · 节点 ⑰）</button>
   </div>
   <div class="panel active" id="panel-rag">
     <div class="card">
@@ -139,6 +140,22 @@ h3{margin:4px 0 10px;font-size:15px}
       </div>
       <div id="tasks-table"></div>
       <div id="tasks-out" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-mes">
+    <div class="card">
+      <div class="row">
+        <div><label>天窗总成 SN（冻结语法 ROOF-#####）</label><input id="mes-sn" size="14" value="ROOF-10001"></div>
+        <div style="min-width:300px"><label>请求字段（1..3 个）</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="mes-f-torque" checked> assembly_torque</label>
+          <label style="display:inline-block;margin-right:10px"><input type="checkbox" id="mes-f-ecu" checked> ecu_flash</label>
+          <label style="display:inline-block"><input type="checkbox" id="mes-f-wave" checked> sensor_waveform</label>
+        </div>
+        <div><label>波形分页段（0..3，R-2）</label><input id="mes-seg" type="number" min="0" max="3" value="0" size="4"></div>
+        <div><button id="btn-mes">抓取生产记录</button></div>
+      </div>
+      <div id="mes-out" style="margin-top:12px"></div>
+      <p class="muted">只读 MCP 工具 <code>mes.lookup_production_record@1</code>（effect=read_only，外部写效果恒 0；波形 128 点 × 32 点/段 × 4 段冻结分页，绝不全量回传）。默认身份 ACL 为 OEM-A：ROOF-10001/10002/10003 可见（10003 无波形通道 → 字段级结构化缺失 P-3）；跨项目 SN（ROOF-20001）与未知 SN 返回完全一致的 not_available 封套（零存在性泄漏 P-1，细分原因只进服务端受限审计）。MES 为确定性合成夹具（synthetic=true），波形纯整数生成零随机零时钟。</p>
     </div>
   </div>
 </main>
@@ -299,6 +316,65 @@ function loadTasks(showHint){
   });
 }
 $id('btn-tasks').onclick=function(){loadTasks()};
+
+/* ---------- 面板 ④ MES 生产记录抓取（节点 ⑰ · 只读 MCP） ---------- */
+function mesFields(){
+  var f=[];
+  if($id('mes-f-torque').checked){f.push('assembly_torque')}
+  if($id('mes-f-ecu').checked){f.push('ecu_flash')}
+  if($id('mes-f-wave').checked){f.push('sensor_waveform')}
+  return f;
+}
+function mesFieldCard(name,entry){
+  if(entry.status!=='available'){
+    return '<p>· <code>'+esc(name)+'</code> <span class="badge needs_review">not_available</span>'
+      +' <span class="muted">reason_code='+esc(entry.reason_code||'')+'（结构化缺失, 绝不编造）</span></p>';
+  }
+  var p=entry.payload;
+  if(name==='assembly_torque'){
+    var rows=(p.records||[]).map(function(r){
+      return '<tr><td>'+esc(r.step)+'</td><td>'+r.target_nm+' / '+r.measured_nm+' N·m</td>'
+        +'<td>'+r.angle_deg+'°</td><td>'+esc(r.tool_id)+' @ '+esc(r.station)+'</td>'
+        +'<td>'+esc(r.recorded_at)+'</td></tr>';
+    }).join('');
+    return '<p>· <code>'+esc(name)+'</code>（'+p.count+' 条拧紧记录）</p>'
+      +'<table><thead><tr><th>工序</th><th>目标/实测 N·m</th><th>角度</th><th>工具/工位</th><th>时间</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  if(name==='ecu_flash'){
+    return '<p>· <code>'+esc(name)+'</code></p><dl class="kv">'
+      +kv('ECU 件号',esc(p.ecu_part_no))+kv('软件版本',esc(p.sw_version))
+      +kv('刷写日期',esc(p.flash_date))+kv('标定集',esc(p.calib_set))
+      +kv('校验和',esc(p.checksum))+'</dl>';
+  }
+  var last=(p.total_points/p.segment_points-1);
+  return '<p>· <code>'+esc(name)+'</code>（段 '+p.segment+'/'+last+' · '+p.points_returned+' 点 · '
+    +(p.truncated?'截断，next_segment='+p.next_segment:'末段')+'）</p>'
+    +'<p class="muted">'+esc(p.points.join(', '))+'</p>';
+}
+$id('btn-mes').onclick=function(){
+  var body={sn:$id('mes-sn').value.trim(),fields:mesFields()};
+  var seg=$id('mes-seg').value;
+  if(seg!==''){body.segment=parseInt(seg,10)}
+  $id('mes-out').innerHTML='<p class="muted">抓取中…</p>';
+  api('POST','/api/v1/mes/production-record',body,function(err,j){
+    if(err){$id('mes-out').innerHTML='<p class="err">'+esc(err.message)+'</p>';return}
+    if(!j.ok){
+      $id('mes-out').innerHTML='<div class="card"><p>'+badge('denied')
+        +' <span class="muted">error.code='+esc((j.error||{}).code)+' · run_id='+esc(j.run_id)
+        +' · business_effects='+j.business_effects+'</span></p>'
+        +'<p class="muted">跨项目组 / 未知 SN / 角色不足三者封套完全一致（零存在性泄漏）；细分原因只进服务端受限审计。</p></div>';
+      return;
+    }
+    var r=j.result||{},parts=['<div class="card"><p><span class="badge answered">available</span>'
+      +' <span class="muted">sn='+esc(r.sn)+' · oem_project='+esc(r.oem_project)
+      +' · tool='+esc(j.tool)+'@'+esc(j.version)+' · effect='+esc(j.effect)
+      +' · run_id='+esc(j.run_id)+' · business_effects='+j.business_effects+'</span></p>'];
+    var fs=r.fields||{};
+    Object.keys(fs).forEach(function(k){parts.push(mesFieldCard(k,fs[k]))});
+    parts.push('</div>');
+    $id('mes-out').innerHTML=parts.join('');
+  });
+};
 
 /* ---------- 标签页与健康检查 ---------- */
 (function(){

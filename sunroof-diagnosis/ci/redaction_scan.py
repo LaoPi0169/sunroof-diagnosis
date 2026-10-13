@@ -37,6 +37,7 @@ SCOPE_FILES = [
     os.path.join("application", "models.py"),
     os.path.join("application", "services.py"),
     os.path.join("application", "tasks.py"),
+    os.path.join("application", "mes.py"),
     "workbench_cli.py",
     os.path.join("deploy", "apply_policy_config.py"),
     os.path.join("deploy", "smoke_w08.py"),
@@ -62,6 +63,9 @@ SCOPE_FILES = [
     os.path.join("mcptool", "run_fixtures.py"),
     os.path.join("mcptool", "run_canary.py"),
     os.path.join("mcptool", "run_degradation_drill.py"),
+    os.path.join("mcptool", "mes_contract.py"),
+    os.path.join("mcptool", "mes_store.py"),
+    os.path.join("mcptool", "mes_server.py"),
     os.path.join("workbench_handoff", "app.py"),
 ]
 

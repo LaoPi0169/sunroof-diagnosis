@@ -215,3 +215,44 @@ class SessionIdentity(BaseModel):
     user_id: str
     user_role: str
     allowed_oem_projects: List[str]
+
+
+# ============================================================================
+# 阶段 C 节点 ⑰: MES 生产记录抓取 (只读 MCP 工具) DTO —— 回链 api-contract/
+# mes-lookup-v1.json 与 mcptool/mes_contract.py (封闭合同, 同值互锁;
+# discovery-brief-v1.md In-Scope 第 1 条的阶段 C 兑现)。
+# ============================================================================
+
+
+class MesField(str, Enum):
+    """MES 抓取字段封闭枚举 (与 mcptool.mes_contract.FIELD_ENUM 同值)"""
+    ASSEMBLY_TORQUE = "assembly_torque"
+    ECU_FLASH = "ecu_flash"
+    SENSOR_WAVEFORM = "sensor_waveform"
+
+
+class MesLookupRequest(BaseModel):
+    """MES 抓取请求 Schema (封闭契约: 自报 role/身份等未知字段直接 422)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sn: str = Field(..., pattern=r"^ROOF-\d{5}$",
+                    description="天窗总成 SN (冻结语法 ^ROOF-\\d{5}$, 退返件条码教学格式)")
+    fields: List[MesField] = Field(..., min_length=1, max_length=3,
+                                   description="请求字段封闭枚举, 1..3 个 (重复由工具层 invalid_argument 拒绝)")
+    segment: Optional[int] = Field(default=None, ge=0, le=3,
+                                   description="波形分页段 (R-2 收口): 缺省 0; 每段 32 点 × 4 段")
+
+
+class MesLookupResponse(BaseModel):
+    """MES 抓取响应封套 (失败封套静态 —— 跨项目/未知 SN/角色不足零存在性泄漏)"""
+
+    tool: str
+    version: str
+    effect: str
+    run_id: str
+    ok: bool
+    result: Optional[dict] = None
+    error: Optional[dict] = None
+    business_effects: int = 0
+

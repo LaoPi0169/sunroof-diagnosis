@@ -148,3 +148,21 @@ python ci/run_local_ci.py
 生成层为确定性抽取式替身（零 LLM）；引用支持 1.0 是结构使然而非模型能力；
 语料为合成教学材料；令牌为教学模拟会话。完整口径见 `README.md` 与
 `workbench_handoff` 页脚声明。
+
+## 9. 节点 ⑰ 追加（2026-10-13）：MES 生产记录抓取面板
+
+第四面板「④ MES 生产记录抓取」对接只读 MCP 工具 `mes.lookup_production_record@1`
+（`POST /api/v1/mes/production-record`，身份仍走 §2 同一 `X-Auth-Token` 矩阵）：
+
+- **输入**：SN（冻结语法 `ROOF-#####`）+ 1..3 个字段复选（装配扭矩 / ECU 刷写 /
+  传感器波形）+ 波形分页段 0..3（R-2 收口：128 点 × 32 点/段 × 4 段）；
+- **成功**：按字段渲染拧紧记录表 / ECU 刷写档案 / 波形段点列（含
+  truncated / next_segment 分页提示）；
+- **not_available**（跨项目组 / 未知 SN / 角色不足）三者封套完全一致
+  （零存在性泄漏），细分原因只进服务端受限审计；
+- **字段级缺失**（如 ROOF-10003 无波形通道）：字段条目结构化
+  `FIELD_NOT_AVAILABLE`，绝不编造数值（P-3）；
+- 试玩样例：`ROOF-10001`（本项目组全字段）/ `ROOF-10003`（缺失字段）/
+  `ROOF-20001`（跨项目，默认 OEM-A 身份下零泄漏拒绝）；
+- 诚实边界：MES 为确定性合成夹具（synthetic=true，零真实 MES 连接），外部写
+  效果恒 0（effect=read_only）。工具契约冻结于 `api-contract/mes-lookup-v1.json`。

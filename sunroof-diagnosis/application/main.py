@@ -16,6 +16,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from application.auth import get_trusted_user_from_session
 from application.database import get_spec_check_task, init_db, list_spec_check_tasks
 from application.models import (
+    MesLookupRequest,
+    MesLookupResponse,
     RagAnswerRequest,
     RagAnswerResponse,
     SessionIdentity,
@@ -25,6 +27,7 @@ from application.models import (
     TaskResponse,
     TrustedUser,
 )
+from application import mes as mes_gateway
 from application.rag import answer_query, corpus_meta
 from application.services import process_spec_check
 from application.tasks import process_task_action
@@ -163,3 +166,33 @@ def rag_answer_endpoint(
 )
 def rag_corpus_meta():
     return corpus_meta()
+
+
+# ============================================================================
+# 阶段 C 节点 ⑰: MES 生产记录抓取 HTTP 面 (只读 MCP 工具)
+# discovery-brief-v1.md In-Scope 第 1 条的阶段 C 兑现; R-2 (波形分页/裁剪)
+# 在本工具 schema 冻结时收口 (api-contract/mes-lookup-v1.json)。
+# ============================================================================
+
+
+@app.post(
+    "/api/v1/mes/production-record",
+    response_model=MesLookupResponse,
+    summary="按 SN 只读抓取 MES 生产记录 (装配扭矩/ECU 刷写/传感器波形, 只读 MCP)",
+    status_code=status.HTTP_200_OK,
+)
+def mes_production_record_endpoint(
+    request: MesLookupRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> MesLookupResponse:
+    """
+    把 mcptool mes.lookup_production_record@1 以 HTTP 形式追加暴露 (仅追加能力):
+    * 身份只来自服务端可信会话 (X-Auth-Token); 跨项目/未知 SN/角色不足三者
+      用户面封套逐字节一致 (零存在性泄漏, P-1), 细分原因只进受限审计;
+    * 波形按冻结上限分页 (128 点 × 32 点/段 × 4 段), 绝不全量回传 (R-2 收口);
+    * 字段缺失返回字段级结构化 not_available, 绝不编造数据 (P-3);
+    * 零业务写副作用 (effect=read_only, business_effects 恒 0)。
+    """
+    record = mes_gateway.lookup_production_record(
+        request.sn, [f.value for f in request.fields], request.segment, trusted_user)
+    return MesLookupResponse(**record)

@@ -50,3 +50,43 @@ CI RUN 2026-10-12T05:23:09+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\We
 [PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-pjx9g8iq; port=51202; smokes_passed=4/4
 CI RESULT OK | duration=32.4s | 2026-10-12T05:23:41+00:00 (UTC)
 
+CI RUN 2026-10-12T06:11:01+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 87 tests in 22.194s, exit=0
+}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+[PASS] STAGE-3-redaction :: scanned_files=32; emissions_checked=51; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-2xujwmme; port=59779; smokes_passed=4/4
+CI RESULT OK | duration=26.6s | 2026-10-12T06:11:27+00:00 (UTC)
+
+CI RUN 2026-10-12T06:19:30+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 87 tests in 21.880s, exit=0
+}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+[PASS] STAGE-3-redaction :: scanned_files=32; emissions_checked=51; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-cefk63c0; port=55131; smokes_passed=4/4
+CI RESULT OK | duration=24.9s | 2026-10-12T06:19:55+00:00 (UTC)
+
+CI RUN 2026-10-12T07:03:07+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 87 tests in 22.182s, exit=0
+}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+[PASS] STAGE-3-redaction :: scanned_files=32; emissions_checked=51; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-5ta74uvk; port=49386; smokes_passed=4/4
+CI RESULT OK | duration=26.1s | 2026-10-12T07:03:33+00:00 (UTC)
+
+CI RUN 2026-10-13T12:28:27+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=4; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2
+[PASS] STAGE-2-unittest :: Ran 100 tests in 20.530s, exit=0
+}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+[PASS] STAGE-3-redaction :: scanned_files=36; emissions_checked=52; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-ef1pxxl7; port=49364; smokes_passed=4/4
+CI RESULT OK | duration=23.9s | 2026-10-13T12:28:51+00:00 (UTC)
+

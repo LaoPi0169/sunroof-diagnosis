@@ -225,3 +225,36 @@ CI + 镜像构建双质量门同时生效。
   发布 GHCR；CI 与镜像构建双质量门同时在线。
   教训: 自愈/重建类验证此前只断言"测试全绿"，未断言"冻结物逐字节未动"；
   自本轮起冻结物 raw sha256 前后对照为冷启动改动的标准回归检查。
+
+## 10. 阶段 C 节点 ⑰ —— SN 自动抓取 · 只读 MES MCP 工具（2026-10-13）
+
+discovery-brief-v1.md In-Scope 第 1 条的阶段 C 兑现 + 开放问题 R-2（波形分页/裁剪）
+在工具 schema 冻结时收口。交付: `mes.lookup_production_record@1` 只读 MCP 工具
+（`mcptool/mes_contract.py` 封闭合同 ↔ `api-contract/mes-lookup-v1.json` 同值互锁,
+test_11 逐项断言; `mes_store.py` 确定性合成夹具 synthetic=true, 零写入口;
+`mes_server.py` schema→RBAC→ACL→只读取数校验链）+ HTTP 面
+`POST /api/v1/mes/production-record`（application 仅追加, 不改既有端点语义）
++ 控制台第四面板「MES 生产记录抓取」。
+
+保护指标落地:
+- **P-1**: 未知 SN / 跨项目 / 角色不足 三因的用户面封套逐字节一致
+  （零存在性泄漏; 细分原因 reason_typed=unknown_sn/cross_project_denied/role_denied
+  只进受限审计, 每条含 run_id, external_effects 恒 0）;
+- **P-3**: 已知记录缺失字段返回字段级结构化 not_available
+  （reason_code=FIELD_NOT_AVAILABLE）, 响应内零编造数值;
+- **R-2 收口**: 波形 128 点 × 32 点/段 × 4 段冻结分页（segment/points_returned/
+  truncated/next_segment）, 任何波形载荷永不超过单段上限, 不引入全量回传。
+
+§9.3 教训的标准落地: `mes_store.store_fingerprint()`（静态记录 + 波形探针 sha256）
+作为只读性质回归锚点 —— test_10 对 5 类调用路径（含失败路径）前后对照指纹逐字节
+一致; 波形为纯整数确定性生成（mes-waveform-int-v1, 零随机零时钟零浮点）,
+Linux CI / Windows 本地 / Docker 镜像三处同值。
+
+本地四阶段 CI（节点 ⑰ 代码基线）:
+- STAGE-1-schema PASS; **STAGE-2-unittest PASS（Ran 100 tests in 20.530s, exit=0
+  —— 87 存量 + 13 新增）**; STAGE-3-redaction PASS（**36 文件** / 52 输出点 /
+  violations=0）; STAGE-4-clean-env-smoke PASS（4/4）。
+- 冻结面零改动: Week-13 冻结的 billing MCP 工具语义、冻结 manifest、既有端点
+  语义全部不动（本节点仅追加工具/端点/面板/扫描范围 +4 文件）。
+- 诚实边界: MES 为确定性合成夹具（零真实 MES 连接）; 凭证治理沿用教学模拟静态
+  Token（R-4 口径不变, 上线前需按真实 SSO 重审权限矩阵）。
