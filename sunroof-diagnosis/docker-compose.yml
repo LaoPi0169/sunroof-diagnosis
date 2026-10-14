@@ -1,5 +1,7 @@
-# 天窗异响诊断 · 值守交接工作台 —— 单容器编排
-# 用法: SUNROOF_ADMIN_TOKEN=你的口令 docker compose up -d --build
+# 天窗异响诊断 · 值守交接工作台 —— 单容器编排 (阶段 D 批次 3 生产形态, D3-a)
+# 用法: SUNROOF_ADMIN_TOKEN=你的口令 SUNROOF_TOKEN_SECRET=你的签名秘密 \
+#       docker compose up -d --build
+# 镜像已非 root 化 (uid/gid 10001, 见 Dockerfile D3-a); compose 只做编排与秘密注入。
 services:
   sunroof-workbench:
     build: .
@@ -8,12 +10,18 @@ services:
     ports:
       - "8018:8018"
     environment:
-      # 口令只经环境变量注入, 镜像与 git 里零硬编码 (脱敏扫描口径)
+      # 管理面口令只经环境变量注入, 镜像与 git 里零硬编码 (脱敏扫描口径)
       SUNROOF_ADMIN_TOKEN: ${SUNROOF_ADMIN_TOKEN:-sunroof-admin-w18}
+      # 签名短时令牌签名秘密 (阶段 D 批次 1 application/token_service.py):
+      # 只经环境变量注入, 零字面量硬编码; 留空 = 进程内随机 (重启即失效,
+      # 多副本/重启后已签发令牌全部失效 —— 生产必须显式配置)。
+      SUNROOF_TOKEN_SECRET: ${SUNROOF_TOKEN_SECRET:-}
       SUNROOF_BIND: 0.0.0.0
       SUNROOF_PORT: "8018"
     volumes:
-      # 语料库/工单库持久化; 管理面"沙盒重置"只清进程内状态, 不动此卷
+      # 语料库/工单库持久化; 管理面"沙盒重置"只清进程内状态, 不动此卷。
+      # 备份/恢复 (D3-c): deploy/backup_snapshot.py / deploy/restore_snapshot.py
+      # 容器内用法见 deploy/runbook-v2.md §4 (数据卷 + 审计链快照一致性门)。
       - sunroof-data:/app/data
     restart: unless-stopped
     healthcheck:

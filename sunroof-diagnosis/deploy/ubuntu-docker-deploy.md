@@ -1,9 +1,11 @@
 # Ubuntu 部署指南 —— 天窗诊断工作台（Docker 版，端口 8018）
 
 > 目标读者：负责把 `sunroof-diagnosis/` 工作台发布到 Ubuntu 服务器的运维同事。
-> 应用只用 Python 标准库（零 pip 依赖），镜像基于 `python:3.11-slim`，
-> 构建期自动跑全量集成测试做质量门，测试不过则镜像构建失败。
-> 管理面口令只经环境变量注入，镜像与 git 仓库零硬编码。
+> 镜像基于 `python:3.11-slim`；**阶段 D 批次 3 起为生产化非 root 镜像**
+> （专用用户 `sunroof` uid/gid 10001，运行时进程零 root），构建期自动以该
+> 非 root 身份跑全量集成测试做质量门，测试不过则镜像构建失败。
+> 管理面口令与签名令牌秘密只经环境变量注入，镜像与 git 仓库零硬编码。
+> 备份/恢复与运维哈希链校验见 `deploy/runbook-v2.md`（v2 运维手册）。
 
 ## 0. 前置条件
 
@@ -62,11 +64,10 @@ cd ~/sunroof-diagnosis
 docker build -t sunroof-workbench:latest .
 ```
 
-> **质量门口径（2026-10-12 起）**：全量回归共 **87 项**测试。镜像内嵌的
-> 构建期质量门（Dockerfile 里的 `unittest discover` RUN 层）目前**暂为注释
-> 状态**，质量门由 GitHub CI 的 STAGE-2（与本地 `ci/run_local_ci.py` 同一入口）
-> 承担——CI 红 = 不合入，镜像只从绿基线构建。Linux 全绿后可在 Dockerfile
-> 恢复该 RUN 行，恢复后收尾两行应显示 `Ran 87 tests ... / OK`。
+> **质量门口径（2026-10-14 起, D3-a）**：镜像内嵌的构建期质量门（Dockerfile 里的
+> `unittest discover` RUN 层）**已恢复且以非 root 身份执行**——构建期即全量回归
+> （测试数以当期 CI STAGE-2 为准），权限配错或测试失败 = 镜像构建失败。
+> GitHub CI STAGE-2（与本地 `ci/run_local_ci.py` 同一入口）为第二道同源质量门。
 
 > 走了方式 0（预构建镜像）的可跳过本节与 §4a 的 `--build`，直接按 §10 拉镜像运行。
 
@@ -74,8 +75,10 @@ docker build -t sunroof-workbench:latest .
 
 ```bash
 export SUNROOF_ADMIN_TOKEN='换成你自己的强口令'
+export SUNROOF_TOKEN_SECRET='换成你自己的随机签名秘密'   # D3-a: 留空=进程随机, 重启即失效
 docker compose up -d --build
 docker compose ps        # STATUS 应为 Up (healthy)
+docker exec sunroof-workbench id   # D3-a: 期待 uid=10001(sunroof) —— 非 root 运行
 ```
 
 ## 4b. 或者裸 docker run（不用 compose）
@@ -201,6 +204,19 @@ docker run -d --name sunroof-workbench \
 
 > GHCR 包首次发布后默认 private：公开匿名拉取需在 GitHub → Packages → 该包 →
 > Package settings 改为 public；或保持 private，服务器 `docker login ghcr.io` 后拉取。
+
+## 12. 阶段 D 批次 3 增补（2026-10-14）：非 root + 备份/恢复
+
+- **非 root 镜像**：专用用户 `sunroof`（uid/gid 10001）——构建期测试门即以该身份
+  执行（权限配错 = 构建失败）；数据卷 `sunroof-data` 由容器以同一 uid 读写，
+  卷内文件属主如显示 `10001` 属正常现象。
+- **签名令牌秘密**：compose 追加 `SUNROOF_TOKEN_SECRET` 注入（`application/token_service.py`
+  的 `sr1.*` HMAC 签名秘密）；留空 = 进程内随机（重启即失效，多副本必须显式配置）。
+- **备份/恢复**（数据卷 + 审计哈希链快照一致性门）与运维期哈希链校验：
+  见 `deploy/runbook-v2.md` §3/§4/§5（`deploy/backup_snapshot.py` /
+  `deploy/restore_snapshot.py`——校验不过不产出备份 / fail-fast 恢复目标零触碰）。
+- **发布清单 v2**：`release-manifest-v2.json`（六类绑定，schema 005）；
+  部署/回滚锚点见 `deploy/runbook-v2.md` §6 与 `ROLLBACK.md`。
 
 ### （可选）后续加全自动部署到服务器
 

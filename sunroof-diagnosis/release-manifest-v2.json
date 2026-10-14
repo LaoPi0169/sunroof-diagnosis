@@ -1,0 +1,37 @@
+{
+  "manifest_version": "sunroof-release-manifest-v2",
+  "release_id": "sunroof-app-d3-r0",
+  "description": "天窗总成只读诊断 · 阶段 D 批次 3 生产发布包 (回链 specs/production-hardening-brief-v1.md D3 + fde-roadmap-v1.md §2 节点 ⑤)。v2 相比 v1 扩展为六类绑定: 代码基线 / 配置 sha256 / schema 版本 / 冻结合同清单 / 冒烟门 / CI 入口; 交付非 root 生产化镜像 (D3-a) 与备份/恢复脚本 (D3-c)。清单不含任何秘密 (凭据只存在于 application/auth.py 与 token_service.py 与客户端会话, 由 ci/redaction_scan.py 静态门 + 动态测试复验)。",
+  "code_revision": {
+    "baseline_tag": "sunroof-w18-d2-base",
+    "baseline_commit": "9981bc80982081db12ed958d151c85352e577f16",
+    "baseline_note": "阶段 D 批次 2 收官 commit (本清单随 D3 批次 3 提交, 自引用哈希以提交后 main HEAD 与镜像 sha-tag 为准); 运行容器以 ghcr.io/laopi0169/sunroof-workbench:sha-<hash> 精确回溯",
+    "policy": "每周只加层不改层: 批次 3 变更 = 发布包层 (Dockerfile 非 root 化 + compose 生产形态 + release-manifest-v2 + deploy/runbook-v2 + 备份/恢复脚本 + 扫描范围 +2), 冻结面 (001-005 DDL/api-contract/引擎判定表/既有用例语义) 零改动"
+  },
+  "schema_version": "005",
+  "schema_note": "migrations/001-005 幂等可重放; 005 仅新增 audit_chain_head (审计哈希链头) + revoked_tokens (签名令牌吊销) 两表, 不触碰 001-004 冻结 DDL; 备份/恢复脚本对快照强制 verify_audit_chain() 哈希链一致性门",
+  "config_version": "sunroof-config-w08-v1",
+  "config_path": "config/sunroof-config-w08.json",
+  "config_sha256": "ec69ed4ce11cde1735225feb9fbfbb25db2d9ca848c8856826b394777ec2b44f",
+  "frozen_contracts": [
+    {"path": "api-contract/spec-check-v1.json", "sha256": "88b6ebc821383e41bc01c5968b8cbff9de6fd2382edaa0e1f371cb41abae53e7"},
+    {"path": "api-contract/mes-lookup-v1.json", "sha256": "98b17cc7fcb2140c4aab8d0e21b75187a725ddcc3459e90e36dc782ada8a7fff"},
+    {"path": "api-contract/plm-lookup-v1.json", "sha256": "86246748770566a62b3eef90f2ed4284f2512bf29b31892dfc1301e9a15fcc9c"},
+    {"path": "api-contract/qms-lookup-v1.json", "sha256": "bccd70e6ce6a6ee8a60127551e8b2326e4126de18ae998f7c077fc3e568cdec7"},
+    {"path": "api-contract/report-draft-v1.json", "sha256": "f5516288c8030fc51d0b476746ca1d226a043f9c82dcc167a8cc536ed2e51ac5"}
+  ],
+  "fixtures_version": "sunroof-fixtures-001-003 (specs 6 条 + spec_check_tasks 4 条, 迁移内嵌固定合成数据)",
+  "previous_known_good_release": "sunroof-w18-d2-base (阶段 D 批次 2 三源适配器缝, 172/172 全绿, 本地四阶段 CI 全绿)",
+  "deployment_entrypoint": "deploy/runbook-v2.md",
+  "legacy_deployment_readme": "deploy-README.md (阶段 A 节点 ⑤ v1 口径, 保留)",
+  "rollback_runbook": "ROLLBACK.md",
+  "backup_tool": "deploy/backup_snapshot.py (SQLite backup API 在线一致快照 + 快照后 PRAGMA integrity_check + verify_audit_chain 哈希链三重校验, 校验不过不产出备份)",
+  "restore_tool": "deploy/restore_snapshot.py (恢复前 fail-fast 校验 + 元数据 sha256 逐字节比对 + 原子替换 + 恢复后复验)",
+  "image_hardening": {
+    "non_root_uid": 10001,
+    "non_root_gid": 10001,
+    "note": "Dockerfile D3-a: 专用系统用户 sunroof (uid/gid 10001, 无登录 shell), 构建期全量测试门以非 root 身份执行 (权限配错 = 构建失败), HEALTHCHECK 保留"
+  },
+  "smoke_gate": "deploy/smoke_w08.py (4/4 任务级三向对账, /health 200 不作为放量依据)",
+  "ci_entrypoint": "ci/run_local_ci.py (与 .github/workflows/sunroof-ci.yml 同一入口)"
+}

@@ -1,6 +1,6 @@
 # 天窗总成只读诊断系统 · 用户使用手册（USER-GUIDE）
 
-> 版本 v1.0（2026-10-13，阶段 C 收官版）· 适用交付物：交互控制台七面板（8000）
+> 版本 v1.1（2026-10-14，阶段 D 批次 3 增补）· 适用交付物：交互控制台七面板（8000）
 > + 值守交接工作台（8018）· 读者：首次拿到本仓库的验收者 / 演示者 / 课程评审。
 > 本手册一步一步带你从**零**跑到**完整互动演示**，全程约 10 分钟。
 
@@ -281,3 +281,15 @@ PowerShell 用户把 `\` 换成反引号 `` ` `` 或写成单行即可。中文�
 - 全部工具 `effect=read_only`，外部写效果恒 0（绝不创建返修单/隔离单，
   绝不发 8D 报告）；令牌为教学模拟会话，上线前需按真实 SSO 重审权限矩阵；
 - 完整口径见 `README.md`「诚实边界」与 `specs/discovery-brief-v1.md`。
+
+## 10. 阶段 D 批次 3 增补（2026-10-14）：生产发布包（对交互验证零影响）
+
+本手册 §3–§9 的全部交互验证步骤**照旧有效**。批次 3 只改"发布与运维"形态：
+
+| 增补 | 内容 | 对你的影响 |
+|---|---|---|
+| 非 root 镜像 | Dockerfile 专用用户 `sunroof`（uid/gid 10001），构建期全量测试门以非 root 身份执行 | 无感；运维可用 `docker exec sunroof-workbench id` 验证 `uid=10001(sunroof)` |
+| 签名令牌秘密注入 | compose 追加 `SUNROOF_TOKEN_SECRET`（`sr1.*` 令牌的 HMAC 秘密；留空 = 进程随机） | 用 `POST /api/v1/auth/token` 演示签名令牌时，多副本/重启需显式配置才不掉令牌 |
+| 发布清单 v2 | `release-manifest-v2.json` 六类绑定（schema 005 + 5 份冻结合同 sha256） | 验收者可直接核对清单 vs 文件实算 sha256 |
+| 备份/恢复 | `deploy/backup_snapshot.py` / `deploy/restore_snapshot.py`（快照后审计哈希链一致性门；恢复 fail-fast） | 运维教程见 `deploy/runbook-v2.md` §3/§4 |
+| 运维手册 v2 | `deploy/runbook-v2.md`（Ubuntu Docker 部署 / 备份 / 恢复 / 哈希链校验 / 回滚锚点） | 替代散落在各处的运维口径；`deploy-README.md` v1 保留 |

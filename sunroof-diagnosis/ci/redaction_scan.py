@@ -81,6 +81,8 @@ SCOPE_FILES = [
     os.path.join("mcptool", "source_adapter.py"),   # 阶段 D 批次 2: 三源取数适配器缝
     os.path.join("application", "report.py"),
     os.path.join("workbench_handoff", "app.py"),
+    os.path.join("deploy", "backup_snapshot.py"),    # 阶段 D 批次 3: 备份快照工具
+    os.path.join("deploy", "restore_snapshot.py"),   # 阶段 D 批次 3: 恢复工具
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

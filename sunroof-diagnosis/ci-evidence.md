@@ -452,3 +452,59 @@ CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evid
   变换镜像 store 语义，零随机零时钟）；discovery-brief Out-of-Scope 系统级禁止
   不因本缝解禁。
 - 证据日志: `evidence/ci-run-d2.log`。
+
+
+## 15.1 说明
+
+（§15 编号延续批次 2 记录；批次 3 为 §16。）
+
+
+## 16. 阶段 D 批次 3 —— 生产发布包构建（2026-10-14）
+
+阶段 D 三批连做的第 3 批（`specs/production-hardening-brief-v1.md` D3）：
+非 root 生产化镜像（D3-a）+ 发布清单 v2 六类绑定 schema 005（D3-b）+
+部署 runbook v2 + 备份/恢复脚本含审计哈希链快照一致性门（D3-c）。
+Docker 构建/运行验证按既定约束不在 Windows 本机执行，运行验证依托远端
+`sunroof-docker-cd`（GHCR 镜像构建期自带全量测试门，以非 root 身份执行）。
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-d3.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 **001-005** + 完整性 + 必需表 + **哈希链自洽校验（audit_chain_ok=True）** | PASS |
+| STAGE-2-unittest | 全量集成测试（薄片/摄取/任务闭环/部署发布/语料治理/评测/检索/RAG/MCP/生产加固/三源适配器缝/**发布打包**） | PASS（**183 tests，OK = 172 + 发布打包 11**） |
+| STAGE-3-redaction | `ci/redaction_scan.py` 静态扫描（**52 文件**；范围 +`deploy/backup_snapshot.py` +`deploy/restore_snapshot.py`） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门（节点 ⑤ 冻结语义不变） | PASS（**4/4**） |
+
+批次 3 交付点（冻结 001-005 DDL / api-contract / 引擎判定表 / 既有 172 用例语义
+零改动，全部只增不改）：
+
+- **D3-a Dockerfile 生产化**：专用系统用户 `sunroof`（uid/gid 10001，无登录 shell）
+  + `chown /app` + `USER sunroof`；**构建期全量测试门以非 root 身份执行**（镜像内
+  权限配错 = 测试失败 = 构建失败，自证非 root 可运行）；HEALTHCHECK 与构建期
+  质量门保留；OCI labels。`docker-compose.yml` 生产形态：追加
+  `SUNROOF_TOKEN_SECRET` 环境变量注入（留空 = 进程随机，零字面量硬编码），
+  数据卷持久化与 restart/healthcheck 保留。
+- **D3-b `release-manifest-v2.json`**：六类绑定（代码基线 commit `9981bc8…` /
+  config sha256 与 v1 同值零漂移 / **schema 005** / 冻结合同清单 = 5 份
+  `api-contract/*.json` 逐份 sha256 / 冒烟门 / CI 入口）+ `backup_tool`/
+  `restore_tool`/`image_hardening` 交付引用；测试断言全部 sha256 与文件实算
+  逐字节一致且清单零秘密字面量。
+- **D3-c 备份/恢复 + runbook v2**：`deploy/backup_snapshot.py`（SQLite backup API
+  在线一致快照，WAL 安全不撕裂；快照后 `PRAGMA integrity_check` +
+  `verify_audit_chain()` 三重校验，任一不过 → 回滚删除快照、退出码 1，
+  绝不产出坏备份；元数据 JSON 含 `db_sha256`/链结果/表清单；`--verify-only`
+  运维校验模式）；`deploy/restore_snapshot.py`（fail-fast 恢复前校验：完整性 +
+  哈希链 + 元数据 sha256 逐字节比对 → 目标库安全快照 `.pre-restore-<ts>.db` →
+  原子 `os.replace` + WAL 侧车清理 → 恢复后复验；被篡改备份恢复拒绝且目标库
+  逐字节零触碰）；`deploy/runbook-v2.md`（非 root 验机 / 备份 / 恢复 / 运维期
+  哈希链校验 / 回滚锚点联动 ROLLBACK.md）。
+- 新增 11 测试（`tests/test_release_packaging_d3.py`）：manifest 六类绑定 +
+  零秘密 / config sha 实算（含 v1 零漂移） / 冻结合同 sha 实算 / schema 005 引用 /
+  Dockerfile 非 root 静态断言（uid 10001 + USER 非 root + 测试门在 USER 后）/
+  compose 生产形态断言 / 备份快照链门+元数据 / 篡改快照 verify-only 拒绝 /
+  篡改备份恢复 fail-fast 目标零触碰 / 正常恢复逐字节一致+安全快照留存 /
+  扫描范围 +2。
+- 用户既存决策项维持不动（`.gitignore` 损坏编辑 / 再生基线文件 / relic 内层
+  `.git` / 未跟踪 `evidence/ci-run-w16-fix.log`）；提交显式逐文件 add。
+- 证据日志: `evidence/ci-run-d3.log`。
