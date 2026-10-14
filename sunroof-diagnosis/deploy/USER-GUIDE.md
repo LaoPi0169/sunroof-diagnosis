@@ -95,6 +95,12 @@ docker run --rm -p 8000:8000 ghcr.io/laopi0169/sunroof-workbench:latest \
 → 预期：身份卡显示 `当前身份：pqe_trainee_default · 角色 pqe · ACL 项目组 OEM-A`。
 → 证明：免令牌的培训会话可用；令牌错误会得到 401（查询不执行、不落审计）。
 
+> **进阶（阶段 D 生产加固）**：静态令牌之外，系统支持**签名短时令牌**——
+> `POST /api/v1/auth/token` 以静态凭证换取 `sr1.*` HMAC 签名令牌（含过期时间与 jti，
+> 令牌载荷由服务端签名，客户端无法自报角色），质量主管可 `POST /api/v1/auth/revoke`
+> 即时吊销；过期/吊销/改签/畸形一律 401 Default-Deny。设 `SUNROOF_REQUIRE_SIGNED_TOKENS=1`
+> 可让静态令牌退役（默认关闭，教学回放不受影响）。
+
 ### 第 2 步：面板① RAG 问答（带引用的知识问答）
 
 → 操作：点示例圆片 **「SR-DEV-01 · 可答」**（自动填入问句）→ 点 **提交问答**。

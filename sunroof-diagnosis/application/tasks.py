@@ -8,7 +8,10 @@
     引擎同时落节点 02 task_runs 审计, 形成跨节点血缘衔接);
   * confirm/refuse/escalate/supervisor_resolve 幂等, 重复提交返回 ALREADY_APPLIED;
   * 无效状态转移不改变任务终态, 返回 INVALID_TASK_STATE (显式失败不猜答案);
-  * 每个动作 (含越权与无效转移) 都落 task_action_runs 审计留痕。
+  * 每个动作 (含越权与无效转移) 都落 task_action_runs 审计留痕;
+  * 阶段 D 批次 1 (adr-005 D1/D4): 乐观锁版本列 —— 状态写入携带读时版本
+    (expected_version), 并发冲突 -> 结构化 CONCURRENCY_CONFLICT (任务终态不变
+    + 审计留痕, 服务端不盲重试)。
 """
 from application.auth import authorize_action
 from application.database import (
@@ -113,6 +116,22 @@ def _invalid_transition(task: dict, request: TaskActionRequest, user: TrustedUse
     return response
 
 
+def _conflict_response(task: dict, request: TaskActionRequest, user: TrustedUser) -> TaskResponse:
+    """乐观锁冲突 (阶段 D, adr-005 D4): 显式失败不猜答案 —— 任务终态不变 + 审计留痕。
+
+    读时版本已被其他动作推进 (expected_version 过期) -> 结构化拒绝; 服务端不做盲重试,
+    客户端应重新读取任务 (获取新 version) 后再提交。冲突事件同样落审计留痕。
+    """
+    current_status = TaskStatus(task["status"])
+    _audit(request, user, current_status, TaskActionReasonCode.CONCURRENCY_CONFLICT)
+    response = _base_response(task, request, current_status,
+                              TaskActionReasonCode.CONCURRENCY_CONFLICT)
+    response.message = (
+        "任务已被并发动作更新 (版本过期)，本次提交未生效；请重新读取任务后重试。"
+    )
+    return response
+
+
 def process_task_action(request: TaskActionRequest, user: TrustedUser) -> TaskResponse:
     """
     任务状态机总控入口:
@@ -169,11 +188,13 @@ def _handle_check_spec(task: dict, request: TaskActionRequest, user: TrustedUser
     result = process_spec_check(check_request, user)
 
     if result.status == StatusEnum.ANSWERED and result.spec is not None:
-        update_task_state(
+        if not update_task_state(
             task["task_id"],
             TaskStatus.ANSWERED.value,
             matched_spec_id=result.spec.spec_id,
-        )
+            expected_version=task["version"],
+        ):
+            return _conflict_response(task, request, user)
         response = _base_response(task, request, TaskStatus.ANSWERED,
                                   TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES)
         response.candidate_spec = result.spec
@@ -183,7 +204,9 @@ def _handle_check_spec(task: dict, request: TaskActionRequest, user: TrustedUser
 
     # needs_review 分支 (SPEC_HARD_LIMIT_EXCEEDED / NO_MATCHING_SPEC / SPEC_CONFLICT)
     reason = TaskActionReasonCode(result.reason_code.value)
-    update_task_state(task["task_id"], TaskStatus.NEEDS_REVIEW.value, reason_code=reason.value)
+    if not update_task_state(task["task_id"], TaskStatus.NEEDS_REVIEW.value,
+                             reason_code=reason.value, expected_version=task["version"]):
+        return _conflict_response(task, request, user)
     response = _base_response(task, request, TaskStatus.NEEDS_REVIEW, reason)
     response.escalation_preview = result.reviewer_preview
     _audit(request, user, TaskStatus.NEEDS_REVIEW, reason)
@@ -203,8 +226,10 @@ def _handle_confirm(task: dict, request: TaskActionRequest, user: TrustedUser) -
     if current != TaskStatus.ANSWERED.value:
         return _invalid_transition(task, request, user)
 
-    update_task_state(task["task_id"], TaskStatus.CONFIRMED.value,
-                      reason_code=TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES.value)
+    if not update_task_state(task["task_id"], TaskStatus.CONFIRMED.value,
+                             reason_code=TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES.value,
+                             expected_version=task["version"]):
+        return _conflict_response(task, request, user)
     _audit(request, user, TaskStatus.CONFIRMED, TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES)
     response = _base_response(task, request, TaskStatus.CONFIRMED,
                               TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES)
@@ -225,8 +250,10 @@ def _handle_refuse(task: dict, request: TaskActionRequest, user: TrustedUser) ->
     if current != TaskStatus.ANSWERED.value:
         return _invalid_transition(task, request, user)
 
-    update_task_state(task["task_id"], TaskStatus.REFUSED.value,
-                      reason_code=TaskActionReasonCode.REFUSED_BY_AGENT.value)
+    if not update_task_state(task["task_id"], TaskStatus.REFUSED.value,
+                             reason_code=TaskActionReasonCode.REFUSED_BY_AGENT.value,
+                             expected_version=task["version"]):
+        return _conflict_response(task, request, user)
     _audit(request, user, TaskStatus.REFUSED, TaskActionReasonCode.REFUSED_BY_AGENT)
     response = _base_response(task, request, TaskStatus.REFUSED,
                               TaskActionReasonCode.REFUSED_BY_AGENT)
@@ -257,8 +284,11 @@ def _handle_escalate(task: dict, request: TaskActionRequest, user: TrustedUser) 
         if task["reason_code"]
         else TaskActionReasonCode.SPECIAL_TASK_REQUIRES_REVIEW
     )
-    update_task_state(task["task_id"], TaskStatus.ESCALATED.value,
-                      reason_code=reason.value, idempotency_key=request.idempotency_key)
+    if not update_task_state(task["task_id"], TaskStatus.ESCALATED.value,
+                             reason_code=reason.value,
+                             idempotency_key=request.idempotency_key,
+                             expected_version=task["version"]):
+        return _conflict_response(task, request, user)
     _audit(request, user, TaskStatus.ESCALATED, reason)
     response = _base_response(task, request, TaskStatus.ESCALATED, reason)
     response.escalation_preview = ReviewPreview(
@@ -284,8 +314,10 @@ def _handle_supervisor_resolve(task: dict, request: TaskActionRequest,
     if current != TaskStatus.ESCALATED.value:
         return _invalid_transition(task, request, user)
 
-    update_task_state(task["task_id"], TaskStatus.ACTION_COMPLETED.value,
-                      reason_code=TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES.value)
+    if not update_task_state(task["task_id"], TaskStatus.ACTION_COMPLETED.value,
+                             reason_code=TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES.value,
+                             expected_version=task["version"]):
+        return _conflict_response(task, request, user)
     _audit(request, user, TaskStatus.ACTION_COMPLETED, TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES)
     response = _base_response(task, request, TaskStatus.ACTION_COMPLETED,
                               TaskActionReasonCode.SUPPORTED_CURRENT_SOURCES)

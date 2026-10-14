@@ -31,8 +31,13 @@ from application.models import (
     SpecCheckResponse,
     TaskActionRequest,
     TaskResponse,
+    TokenIssueRequest,
+    TokenIssueResponse,
+    TokenRevokeRequest,
+    TokenRevokeResponse,
     TrustedUser,
 )
+from application import token_service
 from application import mes as mes_gateway
 from application import plm as plm_gateway
 from application import qms as qms_gateway
@@ -52,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Sunroof Read-Only Spec Check API",
     description="天窗总成只读诊断 · 装配规格核对确定性垂直薄片 (节点 02) + 双角色任务闭环 (节点 04)",
-    version="1.1.0",
+    version="1.2.0",  # 阶段 D 批次 1: +签名短时令牌生命周期 (仅追加端点, 既有语义零改动)
     lifespan=lifespan,
 )
 
@@ -307,3 +312,67 @@ def report_draft_endpoint(
     record = report_gateway.draft_root_cause(
         request.sn, request.part_no, request.process_step, trusted_user)
     return ReportDraftResponse(**record)
+
+
+# ============================================================================
+# 阶段 D 批次 1: 签名短时令牌生命周期 (specs/production-hardening-brief-v1.md D1-c
+# + adr-005 D5/D6) —— 仅追加端点, 既有端点语义零改动。
+# 签发 = 静态教学凭证换 HMAC 签名短时令牌; 未知用户与坏凭证同封套 401 (零存在性泄漏)。
+# 吊销 = quality_supervisor 专属 (非主管 403); 吊销后该 jti 令牌立即 401 Default-Deny。
+# 诚实边界: 非真实 SSO —— 生产上线前按 specs/role-and-permission-matrix.md 重审身份源。
+# ============================================================================
+
+
+@app.post(
+    "/api/v1/auth/token",
+    response_model=TokenIssueResponse,
+    summary="以静态教学凭证换取 HMAC 签名短时令牌 (sr1.*, 过期/吊销/改签一律 401)",
+    status_code=status.HTTP_200_OK,
+)
+def issue_token_endpoint(request: TokenIssueRequest) -> TokenIssueResponse:
+    """签发签名短时令牌 (阶段 D 生产加固):
+    * 身份 + 凭证必须成对匹配 (身份目录与 auth.py 静态映射同值);
+    * 未知用户 / 错误凭证 / 非法 TTL -> 同封套 401 (身份存在性零泄漏);
+    * 令牌载荷由服务端 HMAC 签名 (sub/role/projects), 客户端无法自报角色。
+    """
+    try:
+        issued = token_service.issue_token(
+            request.user_id,
+            ttl_seconds=(request.ttl_seconds if request.ttl_seconds is not None
+                         else token_service.DEFAULT_TTL_SECONDS),
+            credential=request.credential,
+        )
+    except token_service.TokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user_id or credential",
+        )
+    return TokenIssueResponse(**issued)
+
+
+@app.post(
+    "/api/v1/auth/revoke",
+    response_model=TokenRevokeResponse,
+    summary="吊销签名令牌 (jti 入吊销表即时失效; quality_supervisor 专属)",
+    status_code=status.HTTP_200_OK,
+)
+def revoke_token_endpoint(
+    request: TokenRevokeRequest,
+    trusted_user: TrustedUser = Depends(get_trusted_user_from_session),
+) -> TokenRevokeResponse:
+    """吊销签名令牌 (阶段 D 生产加固):
+    * quality_supervisor 专属 —— 其他角色 403 (服务端一票否决, 不信任请求体自报);
+    * INSERT OR IGNORE 幂等: 重复吊销 revoked=False 仍 200;
+    * 只存 jti/吊销人/原因, 不存令牌载荷全文与任何秘密。
+    """
+    if trusted_user.user_role != "quality_supervisor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only quality_supervisor can revoke tokens",
+        )
+    newly_revoked = token_service.revoke_token(
+        request.jti, revoked_by=trusted_user.user_id, reason=request.reason
+    )
+    return TokenRevokeResponse(
+        revoked=newly_revoked, jti=request.jti, revoked_by=trusted_user.user_id
+    )

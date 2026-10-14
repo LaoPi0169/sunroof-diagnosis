@@ -358,3 +358,48 @@ HTTP 面 `POST /api/v1/report/draft` + 控制台第七面板。
   精确分型）。
 - 阶段 C 收官: discovery-brief In-Scope 1/2/3 全部兑现（⑰ MES 抓取 + ⑱ PLM +
   ⑲ QMS + ⑳ 报告草稿）; 冻结面零改动（仅追加工具/端点/面板/扫描范围 +8 文件）。
+
+
+## 14. 阶段 D 批次 1 —— 生产加固三件套（2026-10-14）
+
+阶段 D 三批连做的第 1 批（`specs/production-hardening-brief-v1.md` D1 +
+`adr-005-production-hardening-adaptations.md`），对应 decision-memo-02 §3 生产化
+差距清单第 1/2/3 条：并发乐观锁（D1-a）+ 审计哈希链（D1-b）+ 签名短时令牌（D1-c）。
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-d1.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 **001-005**（+`audit_chain_head` 单行只追加链头 + `revoked_tokens` jti 主键）+ 完整性 + 必需表 + **哈希链自洽校验（audit_chain_ok=True）** | PASS |
+| STAGE-2-unittest | 全量集成测试（薄片/摄取/任务闭环/部署发布/语料治理/评测/检索/RAG/MCP/**生产加固**） | PASS（**156 tests，OK = 139 + 生产加固 17**） |
+| STAGE-3-redaction | `ci/redaction_scan.py` 静态扫描（**49 文件** / 54 处输出语句 / 凭据+规格正文双规则；范围 +`application/token_service.py`） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门（节点 ⑤ 冻结语义不变） | PASS（**4/4**） |
+
+批次 1 交付点（冻结 001-004 DDL / 既有端点语义 / 139 用例基线零改动，全部只增不改）：
+
+- **D1-a 并发乐观锁**：`spec_check_tasks` 幂等 ALTER 追加 `version` 列；
+  `update_task_state(expected_version=…)` 条件更新 + 版本自增；五个动作处理器全部
+  携带读时版本，过期版本 → 结构化 `CONCURRENCY_CONFLICT`（任务终态不变 + 审计留痕，
+  绝不盲重试）；附带 `journal_mode=WAL` + `busy_timeout=5000`（写并发等待而非立即 SQLITE_BUSY）。
+- **D1-b 审计哈希链**：`task_action_runs` 追加 `prev_entry_hash`/`entry_hash`，
+  每次审计写入 = 同事务「读链头 → sha256(prev_hash + "|" + canonical_json) → 追加行 →
+  推进链头」；历史空链行启动一次性回填（只补哈希注记，业务字段零改动，幂等可重入）；
+  `verify_audit_chain()` 重算哈希 + 前向链接 + 链头一致三重校验，篡改/删行/链头破坏
+  均定位到首个坏 run_id。
+- **D1-c 签名短时令牌**：`application/token_service.py` HMAC-SHA256
+  `sr1.<payload>.<sig>`（sub/role/projects/iat/exp/jti），秘密 env
+  `SUNROOF_TOKEN_SECRET` 缺省进程随机（零字面量硬编码）；`POST /api/v1/auth/token`
+  静态凭证换签名令牌（未知用户/坏凭证/非法 TTL 同封套 401 零存在性泄漏）；
+  `POST /api/v1/auth/revoke` 主管专属（非主管 403，INSERT OR IGNORE 幂等吊销）；
+  `SUNROOF_REQUIRE_SIGNED_TOKENS=1` 严格模式退役静态令牌（默认关闭，教学回放零回归）。
+
+- 新增 17 测试（`tests/test_production_hardening.py`）：迁移幂等 schema / 连接
+  WAL+busy_timeout / 乐观锁三态（成功自增/冲突拒绝/缺省等价基线）/ 陈旧版本结构化冲突 /
+  全状态写版本自增 / 哈希链全流量完整性 / 业务字段篡改定位 / 删行前向链接检测 /
+  链头篡改检测 / 历史行幂等补链 / 签名令牌 E2E（身份卡 ACL 对称 + 主管跨项目只读）/
+  过期 Default-Deny / 吊销生命周期（主管专属+幂等）/ 改签与畸形 / 签发面零存在性泄漏 /
+  严格模式退役静态令牌 / 回归守卫（默认培训身份 + 未知静态令牌 401）。
+- 诚实边界：`sr1.*` 为「生产形状」的教学实现（HMAC+过期+吊销），非真实 SSO/OIDC——
+  按真实身份源重审权限矩阵保持开放（Brief §2 非目标 1）；哈希链为单机 SQLite
+  防篡改注记，不外推分布式账本语义。
+- 证据日志: `evidence/ci-run-d1.log`。

@@ -1,16 +1,28 @@
 """
-服务端可信会话鉴权 (阶段 A 节点 02)
+服务端可信会话鉴权 (阶段 A 节点 02 + 阶段 D 批次 1 生产加固 D1-c)
 
 回链 specs/role-and-permission-matrix.md + vertical-slice-contract.md §5:
   * 身份只来自服务端 Header/Session (X-Auth-Token)，绝不信任请求体自报的角色;
   * 每个可信身份随签发其项目组 ACL 范围 (allowed_oem_projects)，供 SQL 层下推;
-  * Default-Deny: 未知 Token 一律 401，查询不执行、不落库。
+  * Default-Deny: 未知 Token 一律 401，查询不执行、不落库;
+  * 阶段 D (adr-005 D5): `sr1.` 前缀走 HMAC 签名短时令牌 (验签+过期+吊销);
+    静态教学映射默认保留 (教学回放零回归); SUNROOF_REQUIRE_SIGNED_TOKENS=1
+    严格模式下静态令牌退役 (401)。
 """
+import os
 from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
 from application.models import TaskAction, TrustedUser
+from application.token_service import (
+    TOKEN_PREFIX,
+    TokenError,
+    trusted_user_from_token,
+)
+
+# 静态教学令牌严格模式开关 (adr-005 D5): 置 "1" 后静态映射退役, 只认 sr1.* 签名令牌
+STRICT_SIGNED_TOKENS_ENV = "SUNROOF_REQUIRE_SIGNED_TOKENS"
 
 
 def get_trusted_user_from_session(x_auth_token: Optional[str] = Header(None)) -> TrustedUser:
@@ -22,6 +34,23 @@ def get_trusted_user_from_session(x_auth_token: Optional[str] = Header(None)) ->
         # 默认使用 PQE 培训测试身份（用于模拟正常流程; 教学模拟会话, 回链原仓库第 5 周惯例）
         return TrustedUser(
             user_id="pqe_trainee_default", user_role="pqe", allowed_oem_projects=["OEM-A"]
+        )
+
+    # 阶段 D: 签名短时令牌路径 (验签 + 过期 + 吊销三重防护, 任一失败 401 Default-Deny)
+    if x_auth_token.startswith(TOKEN_PREFIX):
+        try:
+            return trusted_user_from_token(x_auth_token)
+        except TokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+
+    # 严格模式下静态教学令牌退役 (签名令牌成为唯一凭证面)
+    if os.environ.get(STRICT_SIGNED_TOKENS_ENV) == "1":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Static teaching tokens are disabled (strict signed-token mode)",
         )
 
     # 根据 Header Token 校验角色并注入 ACL 范围

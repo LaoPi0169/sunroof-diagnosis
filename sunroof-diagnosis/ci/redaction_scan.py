@@ -37,6 +37,7 @@ SCOPE_FILES = [
     os.path.join("application", "models.py"),
     os.path.join("application", "services.py"),
     os.path.join("application", "tasks.py"),
+    os.path.join("application", "token_service.py"),   # 阶段 D 批次 1: 签名短时令牌服务
     os.path.join("application", "mes.py"),
     os.path.join("application", "plm.py"),
     "workbench_cli.py",
@@ -102,6 +103,7 @@ BODY_MARKER_EXEMPT_FILES = {"workbench_cli.py"}
 # 注: ci/redaction_scan.py 在列 —— 扫描器自身必须持有字面量清单才能检测违规
 SECRET_LITERAL_ALLOWED_FILES = {
     os.path.join("application", "auth.py"),
+    os.path.join("application", "token_service.py"),  # 阶段 D: 签发凭证校验 (与 auth.py 同理由: 服务端定义与校验面)
     "workbench_cli.py",
     os.path.join("deploy", "smoke_w08.py"),
     os.path.join("ci", "redaction_scan.py"),

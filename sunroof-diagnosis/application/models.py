@@ -130,6 +130,9 @@ class TaskActionReasonCode(str, Enum):
     ACTION_NOT_ALLOWED = "ACTION_NOT_ALLOWED"
     REFUSED_BY_AGENT = "REFUSED_BY_AGENT"
     INVALID_TASK_STATE = "INVALID_TASK_STATE"
+    # 阶段 D 批次 1 (adr-005 D4): 乐观锁冲突显式失败 —— 任务终态不变 + 审计留痕。
+    # 枚举只增不改不重排, 与既有 9 个原因码同层 (冻结语义零影响)。
+    CONCURRENCY_CONFLICT = "CONCURRENCY_CONFLICT"
 
 
 class TaskActionRequest(BaseModel):
@@ -368,4 +371,52 @@ class ReportDraftResponse(BaseModel):
     result: Optional[dict] = None
     error: Optional[dict] = None
     business_effects: int = 0
+
+
+# ============================================================================
+# 阶段 D 批次 1: 签名短时令牌生命周期 DTO (specs/production-hardening-brief-v1.md
+# D1-c + adr-005 D5/D6)。封闭契约: extra="forbid" 自报未知字段直接 422;
+# 响应只含令牌/过期秒数/jti, 绝不回显凭证本身。
+# ============================================================================
+
+
+class TokenIssueRequest(BaseModel):
+    """签发请求 Schema (静态教学凭证换签名短时令牌; 身份与凭证必须成对匹配)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(..., min_length=1, max_length=64, description="教学身份目录内的 user_id")
+    credential: str = Field(..., min_length=1, max_length=128,
+                             description="该身份的静态教学凭证 (错误 -> 与未知用户同封套 401, 零存在性泄漏)")
+    ttl_seconds: Optional[int] = Field(
+        default=None, ge=1, le=43200,
+        description="令牌有效期秒数 (缺省 3600, 上限 43200=12h; 越界 401/INVALID_TTL)")
+
+
+class TokenIssueResponse(BaseModel):
+    """签发响应 (access_token 为 sr1.* 签名短时令牌; 绝不回显请求中的凭证)"""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    jti: str
+    issued_for: str
+
+
+class TokenRevokeRequest(BaseModel):
+    """吊销请求 Schema (quality_supervisor 专属; jti 为签发响应中的令牌标识)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    jti: str = Field(..., min_length=1, max_length=64, description="待吊销令牌的 jti")
+    reason: Optional[str] = Field(default=None, max_length=200,
+                                  description="可选结构化吊销原因 (只存标识与原因, 不存令牌全文)")
+
+
+class TokenRevokeResponse(BaseModel):
+    """吊销响应 (重复吊销幂等: revoked=False 仍为 200 成功)"""
+
+    revoked: bool
+    jti: str
+    revoked_by: str
 

@@ -2,7 +2,7 @@
 本地 CI 流水线运行器 (Local CI Runner) —— 节点 05 (回链 specs/mission-week-08.md 第 2 天)
 
 与 .github/workflows/ci.yml 共用同一入口, 四阶段:
-  STAGE-1 Schema 检查: 临时库幂等迁移 (001-004) + PRAGMA 完整性 + 必需表存在性
+  STAGE-1 Schema 检查: 临时库幂等迁移 (001-005) + PRAGMA 完整性 + 必需表存在性 + 审计哈希链自洽
   STAGE-2 全量测试:   unittest discover (垂直薄片/摄取幂等/任务闭环/部署发布)
   STAGE-3 脱敏扫描:   ci/redaction_scan.py (凭据/规格正文不入运行时输出)
   STAGE-4 干净环境任务冒烟: git archive HEAD -> 全新目录 -> uvicorn 独立实例
@@ -32,6 +32,8 @@ sys.path.insert(0, PROJECT_ROOT)
 
 REQUIRED_TABLES = {
     "specs", "task_runs", "spec_check_tasks", "task_action_runs", "policy_config",
+    # 阶段 D 批次 1 (migrations/005): 审计哈希链头 + 签名令牌吊销表
+    "audit_chain_head", "revoked_tokens",
 }
 SUBPROCESS_ENV = {
     **os.environ.copy(),
@@ -54,11 +56,11 @@ def _run(cmd, cwd, timeout=300):
 # STAGE-1: Schema 检查 (幂等迁移 001-004 + 完整性 + 必需表)
 # ---------------------------------------------------------------------------
 def stage_1_schema_check():
-    from application.database import MIGRATION_SCRIPTS, init_db
+    from application.database import MIGRATION_SCRIPTS, init_db, verify_audit_chain
 
     with tempfile.TemporaryDirectory(prefix="sunroof-ci-schema-") as tmp:
         db_path = os.path.join(tmp, "schema_check.db")
-        init_db(db_path)  # 幂等迁移: 001 + 002 + 003 + 004
+        init_db(db_path)  # 幂等迁移: 001-005
         conn = sqlite3.connect(db_path)
         try:
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
@@ -67,15 +69,20 @@ def stage_1_schema_check():
                 for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
             seeds = conn.execute("SELECT COUNT(*) FROM policy_config").fetchone()[0]
+            chain = verify_audit_chain(conn)  # 阶段 D: 审计哈希链初始化即须自洽
         finally:
             conn.close()
     missing = REQUIRED_TABLES - tables
     ingestion_tables = [name for name in tables if name.startswith("ingestion")]
-    passed = integrity == "ok" and not missing and len(ingestion_tables) >= 1 and seeds >= 2
+    passed = (
+        integrity == "ok" and not missing and len(ingestion_tables) >= 1
+        and seeds >= 2 and chain["ok"]
+    )
     detail = (
         f"integrity={integrity}; migrations={len(MIGRATION_SCRIPTS)}; "
         f"required_tables_missing={sorted(missing)}; ingestion_tables={len(ingestion_tables)}; "
-        f"policy_config_seed_rows={seeds}"
+        f"policy_config_seed_rows={seeds}; "
+        f"audit_chain_ok={chain['ok']}; chain_entries={chain['entry_count']}"
     )
     return passed, detail
 
