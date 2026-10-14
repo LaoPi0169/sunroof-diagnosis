@@ -78,6 +78,7 @@ SCOPE_FILES = [
     os.path.join("mcptool", "report_contract.py"),
     os.path.join("mcptool", "report_aggregate.py"),
     os.path.join("mcptool", "report_server.py"),
+    os.path.join("mcptool", "source_adapter.py"),   # 阶段 D 批次 2: 三源取数适配器缝
     os.path.join("application", "report.py"),
     os.path.join("workbench_handoff", "app.py"),
 ]

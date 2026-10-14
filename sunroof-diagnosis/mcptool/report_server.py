@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from mcptool import report_aggregate as agg
 from mcptool import report_contract as M
+from mcptool import source_adapter
 
 
 def draft_root_cause(trusted_context: dict, arguments: dict,
@@ -38,7 +39,14 @@ def draft_root_cause(trusted_context: dict, arguments: dict,
         agg.merge_nested_audit(audit_sink, nested)
         _audit(audit_sink, run_id, part_no, "source_unavailable:" + failed, 0)
         return _unavailable()
-    result = agg.assemble_result(envelopes, sn, part_no, process_step)
+    try:
+        result = agg.assemble_result(envelopes, sn, part_no, process_step)
+    except source_adapter.SourceUnavailableError as exc:
+        # D2-b 兜底: 组装期取数缝瞬断 (R-2 波形 gap 复核) -> 既有结构化拒答口径
+        agg.merge_nested_audit(audit_sink, nested)
+        _audit(audit_sink, run_id, part_no,
+               source_adapter.SOURCE_UNAVAILABLE_PREFIX + exc.source, 0)
+        return _unavailable()
     agg.merge_nested_audit(audit_sink, nested)
     _audit(audit_sink, run_id, part_no, "ok", 0)
     return {"ok": True, "result": result}

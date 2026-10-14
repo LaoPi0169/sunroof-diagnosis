@@ -16,12 +16,15 @@ P-2 取数纪律: sop_rows/standard_rows 中 is_current=0 的被替代行在本�
 P-3: 字段行完全缺失 -> reason_code=FIELD_NOT_AVAILABLE, 绝不编造数据。
 成功封套字段级结构: available → {"status", "payload"} (server 组装, 静态行裁剪为
 用户面白名单字段 + count, 不透传 is_current/superseded_by 内部治理键)。
-外部写效果恒 0 (effect=read_only; 本模块与 qms_store 均无任何写入口)。
+外部写效果恒 0 (effect=read_only; 本模块无任何写入口)。
+取数经 mcptool/source_adapter.py 注入缝 (阶段 D 批次 2): 默认合成夹具逐字节等价;
+可选注入 HTTP 适配器, 源不可达 -> 既有 not_available 封套 + 受限审计
+source_unavailable:<源> 精细分型 (用户面三因一致语义不变)。
 """
 from __future__ import annotations
 
 from mcptool import qms_contract as M
-from mcptool import qms_store as store
+from mcptool import source_adapter
 
 # 用户面 payload 白名单 (is_current/superseded_by/supersedes 等内部治理键
 # 永不出工具 —— 被替代版本标识绝不出现在响应, P-2 纪律)
@@ -46,19 +49,27 @@ def lookup_inspection_standard(trusted_context: dict, arguments: dict,
     if role not in M.ALLOWED_ROLES:
         _audit(audit_sink, run_id, part_no, "role_denied", 0)
         return _unavailable()
-    record = store.get_record(part_no)
-    if record is None:
-        _audit(audit_sink, run_id, part_no, "unknown_part", 0)
-        return _unavailable()
-    if role == "pqe":
-        projects = trusted_context.get("allowed_projects")
-        if not isinstance(projects, list) or record["oem_project"] not in projects:
-            _audit(audit_sink, run_id, part_no, "cross_project_denied", 0)
+    store = source_adapter.resolve("qms")
+    try:
+        record = store.get_record(part_no)
+        if record is None:
+            _audit(audit_sink, run_id, part_no, "unknown_part", 0)
             return _unavailable()
-    # quality_supervisor: ["*"] 跨项目只读 (矩阵 §2), 直接放行
-    field_results = {}
-    for field in fields:
-        field_results[field] = _field_result(part_no, field, process_step)
+        if role == "pqe":
+            projects = trusted_context.get("allowed_projects")
+            if not isinstance(projects, list) or record["oem_project"] not in projects:
+                _audit(audit_sink, run_id, part_no, "cross_project_denied", 0)
+                return _unavailable()
+        # quality_supervisor: ["*"] 跨项目只读 (矩阵 §2), 直接放行
+        field_results = {}
+        for field in fields:
+            field_results[field] = _field_result(part_no, field, process_step)
+    except source_adapter.SourceUnavailableError as exc:
+        # D2-b: 源不可达 -> 既有「源不可用结构化拒答」口径 (绝不编造, 绝不回退合成数据):
+        # 用户面仍三因一致 not_available (P-1), 细分原因只进受限审计 (精确分型)。
+        _audit(audit_sink, run_id, part_no,
+               source_adapter.SOURCE_UNAVAILABLE_PREFIX + exc.source, 0)
+        return _unavailable()
     _audit(audit_sink, run_id, part_no, "ok", 0)
     return {"ok": True,
             "result": {"part_no": part_no, "oem_project": record["oem_project"],
@@ -67,7 +78,8 @@ def lookup_inspection_standard(trusted_context: dict, arguments: dict,
 
 
 def _field_result(part_no: str, field: str, process_step: str) -> dict:
-    """单字段取数 (P-2 现行过滤 + P-3 结构化缺失)。"""
+    """单字段取数 (P-2 现行过滤 + P-3 结构化缺失; 异常上抛由入口 try 统一接)。"""
+    store = source_adapter.resolve("qms")
     reason = store.missing_field_reason(part_no, field)
     if reason is not None:
         return {"status": "not_available", "reason_code": reason}

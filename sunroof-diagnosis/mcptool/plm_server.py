@@ -14,12 +14,15 @@
 缺失 → {"status": "not_available", "reason_code": "FIELD_NOT_AVAILABLE"} (P-3)。
 图纸硬门槛: drawing_registry 只返回登记元数据 (content_disclosure=denied_by_policy),
 图纸内容/文件/链接/渲染数据永不出工具 —— 主管亦不展示 (矩阵 §2)。
-外部写效果恒 0 (effect=read_only; 本模块与 plm_store 均无任何写入口)。
+外部写效果恒 0 (effect=read_only; 本模块无任何写入口)。
+取数经 mcptool/source_adapter.py 注入缝 (阶段 D 批次 2): 默认合成夹具逐字节等价;
+可选注入 HTTP 适配器, 源不可达 -> 既有 not_available 封套 + 受限审计
+source_unavailable:<源> 精细分型 (用户面三因一致语义不变)。
 """
 from __future__ import annotations
 
 from mcptool import plm_contract as M
-from mcptool import plm_store as store
+from mcptool import source_adapter
 
 
 def lookup_engineering_record(trusted_context: dict, arguments: dict,
@@ -37,34 +40,41 @@ def lookup_engineering_record(trusted_context: dict, arguments: dict,
     if role not in M.ALLOWED_ROLES:
         _audit(audit_sink, run_id, part_no, "role_denied", 0)
         return _unavailable()
-    record = store.get_record(part_no)
-    if record is None:
-        _audit(audit_sink, run_id, part_no, "unknown_part", 0)
-        return _unavailable()
-    if role == "pqe":
-        projects = trusted_context.get("allowed_projects")
-        if not isinstance(projects, list) or record["oem_project"] not in projects:
-            _audit(audit_sink, run_id, part_no, "cross_project_denied", 0)
+    store = source_adapter.resolve("plm")
+    try:
+        record = store.get_record(part_no)
+        if record is None:
+            _audit(audit_sink, run_id, part_no, "unknown_part", 0)
             return _unavailable()
-    # quality_supervisor: ["*"] 跨项目只读 (矩阵 §2), 直接放行
-    field_results = {}
-    for field in fields:
-        reason = store.missing_field_reason(part_no, field)
-        if reason is not None:
-            field_results[field] = {"status": "not_available", "reason_code": reason}
-            continue
-        if field == "bom_snapshot":
-            payload = {"revision": record["bom_snapshot"]["revision"],
-                       "items": list(record["bom_snapshot"]["items"]),
-                       "count": len(record["bom_snapshot"]["items"])}
-        elif field == "eco_history":
-            payload = store.eco_window(part_no, eco_offset)
-        else:  # drawing_registry: 图纸登记元数据 (内容永不出工具, 矩阵 §2)
-            registry = record["drawing_registry"]
-            payload = {"drawings": list(registry["drawings"]),
-                       "count": len(registry["drawings"]),
-                       "content_disclosure": registry["content_disclosure"]}
-        field_results[field] = {"status": "available", "payload": payload}
+        if role == "pqe":
+            projects = trusted_context.get("allowed_projects")
+            if not isinstance(projects, list) or record["oem_project"] not in projects:
+                _audit(audit_sink, run_id, part_no, "cross_project_denied", 0)
+                return _unavailable()
+        # quality_supervisor: ["*"] 跨项目只读 (矩阵 §2), 直接放行
+        field_results = {}
+        for field in fields:
+            reason = store.missing_field_reason(part_no, field)
+            if reason is not None:
+                field_results[field] = {"status": "not_available", "reason_code": reason}
+                continue
+            if field == "bom_snapshot":
+                payload = {"revision": record["bom_snapshot"]["revision"],
+                           "items": list(record["bom_snapshot"]["items"]),
+                           "count": len(record["bom_snapshot"]["items"])}
+            elif field == "eco_history":
+                payload = store.eco_window(part_no, eco_offset)
+            else:  # drawing_registry: 图纸登记元数据 (内容永不出工具, 矩阵 §2)
+                registry = record["drawing_registry"]
+                payload = {"drawings": list(registry["drawings"]),
+                           "count": len(registry["drawings"]),
+                           "content_disclosure": registry["content_disclosure"]}
+            field_results[field] = {"status": "available", "payload": payload}
+    except source_adapter.SourceUnavailableError as exc:
+        # D2-b: 源不可达 -> 既有「源不可用结构化拒答」口径 (绝不编造, 绝不回退合成数据)。
+        _audit(audit_sink, run_id, part_no,
+               source_adapter.SOURCE_UNAVAILABLE_PREFIX + exc.source, 0)
+        return _unavailable()
     _audit(audit_sink, run_id, part_no, "ok", 0)
     return {"ok": True,
             "result": {"part_no": part_no, "oem_project": record["oem_project"],

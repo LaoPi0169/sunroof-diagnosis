@@ -12,12 +12,15 @@
      external_effects=0, 永不进用户面响应)。
 成功封套字段级结构: available → {"status", "payload"};
 缺失 → {"status": "not_available", "reason_code": "FIELD_NOT_AVAILABLE"} (P-3)。
-外部写效果恒 0 (effect=read_only; 本模块与 mes_store 均无任何写入口)。
+外部写效果恒 0 (effect=read_only; 本模块无任何写入口)。
+取数经 mcptool/source_adapter.py 注入缝 (阶段 D 批次 2): 默认合成夹具逐字节等价;
+可选注入 HTTP 适配器, 源不可达 -> 既有 not_available 封套 + 受限审计
+source_unavailable:<源> 精细分型 (用户面三因一致语义不变)。
 """
 from __future__ import annotations
 
 from mcptool import mes_contract as M
-from mcptool import mes_store as store
+from mcptool import source_adapter
 
 
 def lookup_production_record(trusted_context: dict, arguments: dict,
@@ -35,30 +38,38 @@ def lookup_production_record(trusted_context: dict, arguments: dict,
     if role not in M.ALLOWED_ROLES:
         _audit(audit_sink, run_id, sn, "role_denied", 0)
         return _unavailable()
-    record = store.get_record(sn)
-    if record is None:
-        _audit(audit_sink, run_id, sn, "unknown_sn", 0)
-        return _unavailable()
-    if role == "pqe":
-        projects = trusted_context.get("allowed_projects")
-        if not isinstance(projects, list) or record["oem_project"] not in projects:
-            _audit(audit_sink, run_id, sn, "cross_project_denied", 0)
+    store = source_adapter.resolve("mes")
+    try:
+        record = store.get_record(sn)
+        if record is None:
+            _audit(audit_sink, run_id, sn, "unknown_sn", 0)
             return _unavailable()
-    # quality_supervisor: ["*"] 跨项目只读 (矩阵 §1), 直接放行
-    field_results = {}
-    for field in fields:
-        reason = store.missing_field_reason(sn, field)
-        if reason is not None:
-            field_results[field] = {"status": "not_available", "reason_code": reason}
-            continue
-        if field == "assembly_torque":
-            payload = {"records": record["assembly_torque"],
-                       "count": len(record["assembly_torque"])}
-        elif field == "ecu_flash":
-            payload = dict(record["ecu_flash"])
-        else:  # sensor_waveform: R-2 分页载荷
-            payload = store.waveform_segment(sn, segment)
-        field_results[field] = {"status": "available", "payload": payload}
+        if role == "pqe":
+            projects = trusted_context.get("allowed_projects")
+            if not isinstance(projects, list) or record["oem_project"] not in projects:
+                _audit(audit_sink, run_id, sn, "cross_project_denied", 0)
+                return _unavailable()
+        # quality_supervisor: ["*"] 跨项目只读 (矩阵 §1), 直接放行
+        field_results = {}
+        for field in fields:
+            reason = store.missing_field_reason(sn, field)
+            if reason is not None:
+                field_results[field] = {"status": "not_available", "reason_code": reason}
+                continue
+            if field == "assembly_torque":
+                payload = {"records": record["assembly_torque"],
+                           "count": len(record["assembly_torque"])}
+            elif field == "ecu_flash":
+                payload = dict(record["ecu_flash"])
+            else:  # sensor_waveform: R-2 分页载荷
+                payload = store.waveform_segment(sn, segment)
+            field_results[field] = {"status": "available", "payload": payload}
+    except source_adapter.SourceUnavailableError as exc:
+        # D2-b: 源不可达 -> 既有「源不可用结构化拒答」口径 (绝不编造, 绝不回退合成数据):
+        # 用户面仍三因一致 not_available (P-1), 细分原因只进受限审计 (精确分型)。
+        _audit(audit_sink, run_id, sn,
+               source_adapter.SOURCE_UNAVAILABLE_PREFIX + exc.source, 0)
+        return _unavailable()
     _audit(audit_sink, run_id, sn, "ok", 0)
     return {"ok": True,
             "result": {"sn": sn, "oem_project": record["oem_project"],

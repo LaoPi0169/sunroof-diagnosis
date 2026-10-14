@@ -16,6 +16,7 @@ from mcptool import report_contract as M
 from mcptool import mes_server
 from mcptool import qms_server
 from mcptool import plm_server
+from mcptool import source_adapter
 
 _TOLERANCE_RE = re.compile(r"^\+([\d.]+)/-([\d.]+)$")
 
@@ -212,9 +213,8 @@ def _plm_section(plm_fields, part_no, citations, findings, gaps):
 
 
 def _waveform_gap(sn, gaps):
-    """R-2 载料纪律: 波形绝不嵌入报告 —— 可用性只记结构化 gap。"""
-    from mcptool import mes_store
-    reason = mes_store.missing_field_reason(sn, "sensor_waveform")
+    """R-2 载料纪律: 波形绝不嵌入报告 —— 可用性只记结构化 gap (D2: 经适配器缝取数)。"""
+    reason = source_adapter.resolve("mes").missing_field_reason(sn, "sensor_waveform")
     gaps.append({"topic": "sensor_waveform",
                  "reason_code": (reason if reason else M.WAVEFORM_OMITTED_REASON),
                  "note": "经 MES 工具分页取数 (128 点 x 32 点/段 x 4 段)"})

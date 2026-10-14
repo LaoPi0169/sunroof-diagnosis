@@ -403,3 +403,52 @@ CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evid
   按真实身份源重审权限矩阵保持开放（Brief §2 非目标 1）；哈希链为单机 SQLite
   防篡改注记，不外推分布式账本语义。
 - 证据日志: `evidence/ci-run-d1.log`。
+
+
+## 15. 阶段 D 批次 2 —— 三源真实适配器缝（2026-10-14）
+
+阶段 D 第 2 批（`specs/production-hardening-brief-v1.md` D2-a/D2-b），对应遗留清单
+第 3 类「合成实现层」：三源取数协议 + 适配器注册表（D2-a）+ HTTP 适配器骨架（D2-b）。
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-d2.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-005 + 完整性 + 必需表 + 哈希链自洽校验 | PASS（migrations=5, audit_chain_ok=True） |
+| STAGE-2-unittest | 全量集成测试 | PASS（**172 tests，OK = 156 + 适配器缝 16**） |
+| STAGE-3-redaction | `ci/redaction_scan.py` 静态扫描（**50 文件** / 54 处输出语句；范围 +`mcptool/source_adapter.py`） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+批次 2 交付点（冻结 001-004 DDL / api-contract / 合同同值互锁 / 引擎判定表 /
+既有 156 用例基线零改动）：
+
+- **D2-a 取数协议 + 注册表**：`mcptool/source_adapter.py` 三源取数 `Protocol`
+  （MesSource/QmsSource/PlmSource，与 mes/qms/plm server 对各自 store 的消费面
+  逐一同形）+ 注册表（`resolve`/`register`/`reset_registry`，Protocol 结构校验，
+  换装只追加 journal）；默认实现 `Synthetic*Source` 逐方法委托冻结合成夹具 ——
+  行为逐字节等价；三个 server 取数改走注入缝（schema→RBAC→ACL 校验链不动，
+  store 模块本身零改动）。
+- **D2-b HTTP 适配器骨架**：httpx 传输 + 配置驱动（端点
+  `SUNROOF_SOURCE_{MES,QMS,PLM}_URL` / 超时 `SUNROOF_SOURCE_TIMEOUT_S` /
+  有限重试 `SUNROOF_SOURCE_MAX_RETRIES` 上限 5）；默认关闭（仅
+  `SUNROOF_SOURCE_MODE=http` 且三源端点齐备才换装，缺一快速失败、零部分换装，
+  绝不静默回退合成夹具）；传输语义 200 JSON 对象 | 404 诚实不存在 | 5xx/连接
+  失败/超时有限重试后 `SourceUnavailableError` | 其余 4xx/非 JSON 立即拒 ——
+  绝不编造、绝不回退合成数据；server 层捕获后沿用既有「源不可用结构化拒答」
+  口径（用户面三因一致 `not_available` + 受限审计 `source_unavailable:<源>`
+  精细分型，与 report_server 既有词表同值）。
+
+- 新增 16 测试（`tests/test_source_adapter.py`）：注册表默认合成 + Protocol 校验 /
+  经缝全消费面后三源 store 指纹逐字节一致（D2-a 验收）/ 合成委托逐字节等价 /
+  stub 注入 server+聚合生效、reset 恢复、journal 留痕 / 换装校验零副作用 /
+  默认模式审计路径不变（unknown_sn 分型）/ HTTP 默认关闭 / 缺端点快速失败零副作用 /
+  http 三源换装 + 装配报告 / 配置校验（scheme/timeout/retries/未知源）/
+  MockTransport 回放冻结夹具与 store 直调逐字节等价 / 有限重试（尝试次数 =
+  1+max_retries）/ 不可达分型异常（5xx 耗尽 / 连接级 / 4xx 不重试 / 非 JSON 不编造）/
+  单源结构化拒答 + 审计精确分型 / 聚合面整体拒答（绝不部分合成拼装）/
+  week-17 降级演练语义一致（drills=4 全 pass forbidden=0）。
+- 诚实边界：HTTP 适配器是「缝」而非「集成」—— 真实 MES/QMS/PLM 接入需按其
+  真实 API 契约另做载荷映射与行级过滤（骨架假定载荷与合成夹具同键结构，行级
+  变换镜像 store 语义，零随机零时钟）；discovery-brief Out-of-Scope 系统级禁止
+  不因本缝解禁。
+- 证据日志: `evidence/ci-run-d2.log`。
