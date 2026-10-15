@@ -275,7 +275,7 @@ class RedactionScopeD3Tests(unittest.TestCase):
         self.assertIn("deploy/restore_snapshot.py", rel_paths)
         report = redaction_scan.scan()
         self.assertTrue(report["passed"], report["violations"])
-        self.assertEqual(report["scanned_files"], 54)  # 50 (D2) + 2 (D3-c) + 2 (E1 v2 + E2 聚合器)
+        self.assertEqual(report["scanned_files"], 55)  # 50 (D2) + 2 (D3-c) + 3 (E1 v2 + E2 聚合器 + E3 工作台)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+CI RUN 2026-10-15T02:47:42+00:00 (UTC) | host=local | python=3.13.15 | cwd=D:\WebstormProjects\fde-course-week-05\sunroof-diagnosis
+[PASS] STAGE-1-schema :: integrity=ok; migrations=5; required_tables_missing=[]; ingestion_tables=2; policy_config_seed_rows=2; audit_chain_ok=True; chain_entries=0
+[PASS] STAGE-2-unittest :: Ran 208 tests in 27.128s, exit=0
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl"}
+{"dataset_version": "sunroof-eval-w10-v1", "baseline_release": "sunroof-app-w08-r0", "cases": 60, "deterministic": true, "output": "deterministic-baseline-results-v1.jsonl.rerun"}
+<sys>:0: ResourceWarning: unclosed <socket.socket fd=1000, family=2, type=1, proto=0, laddr=('127.0.0.1', 51668)>
+[PASS] STAGE-3-redaction :: scanned_files=55; emissions_checked=70; violations=0
+[PASS] STAGE-4-clean-env-smoke :: clean_dir=sunroof-ci-cold-pjsgvb_h; port=64753; smokes_passed=4/4
+CI RESULT OK | duration=32.3s | 2026-10-15T02:48:14+00:00 (UTC)
+

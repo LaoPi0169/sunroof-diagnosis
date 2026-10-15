@@ -85,6 +85,7 @@ SCOPE_FILES = [
     os.path.join("deploy", "restore_snapshot.py"),   # 阶段 D 批次 3: 恢复工具
     os.path.join("evaluation", "evaluator_v2.py"),   # 阶段 E 批次 1: 评测器 v2 (判定层补全)
     os.path.join("deploy", "slo_baseline_aggregator.py"),  # 阶段 E 批次 2: SLO 基线聚合器 ([U] 守卫)
+    os.path.join("workbench_sre", "app.py"),         # 阶段 E 批次 3: SRE 值守工作台 (只读, 端口 8021)
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

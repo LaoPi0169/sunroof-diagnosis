@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>SRE 值守工作台 · 天窗总成只读诊断 (阶段 E)</title>
+<style>
+  :root { --bg:#0f1720; --card:#17222e; --line:#263443; --fg:#dbe4ee; --dim:#8fa1b3;
+          --green:#39c07a; --red:#e05252; --amber:#d9a13b; --blue:#4a9eda; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.6 "Microsoft YaHei", "PingFang SC", sans-serif; }
+  header { padding:14px 22px; border-bottom:1px solid var(--line); display:flex;
+           justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  header h1 { font-size:17px; margin:0; }
+  .honesty { font-size:12px; color:var(--amber); max-width:760px; }
+  nav { display:flex; gap:6px; padding:10px 22px 0; flex-wrap:wrap; }
+  nav button { background:var(--card); color:var(--fg); border:1px solid var(--line);
+               border-radius:8px 8px 0 0; padding:8px 16px; cursor:pointer; font-size:13px; }
+  nav button.active { background:#1e2d3d; border-bottom-color:#1e2d3d; color:#fff; }
+  main { margin:0 22px 26px; border:1px solid var(--line); border-radius:0 10px 10px 10px;
+         background:var(--card); padding:18px; min-height:420px; }
+  .hidden { display:none; }
+  h2 { font-size:15px; margin:2px 0 10px; }
+  p.dim, .dim { color:var(--dim); font-size:12.5px; }
+  button.act { background:var(--blue); border:0; color:#fff; padding:8px 18px;
+               border-radius:6px; cursor:pointer; font-size:13px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; }
+  th, td { border-bottom:1px solid var(--line); padding:5px 8px; text-align:left; }
+  th { color:var(--dim); font-weight:normal; }
+  tr.case-row { cursor:pointer; }
+  tr.case-row:hover { background:#1e2d3d; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:10px; font-size:12px; }
+  .tag.ok { background:#123527; color:var(--green); }
+  .tag.bad { background:#3a1a1a; color:var(--red); }
+  .tag.warn { background:#3a2f14; color:var(--amber); }
+  .tag.info { background:#15293b; color:var(--blue); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  .mini { border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:#141e29; }
+  .mini h3 { margin:0 0 6px; font-size:13px; }
+  ul { margin:6px 0; padding-left:18px; }
+  .row-input { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .row-input input { background:#101a24; border:1px solid var(--line); color:var(--fg);
+                     border-radius:6px; padding:6px 10px; width:200px; font-size:13px; }
+  pre { background:#101a24; border:1px solid var(--line); border-radius:8px;
+        padding:10px; font-size:12px; overflow:auto; white-space:pre-wrap; }
+  .kv { font-size:12.5px; } .kv b { color:var(--blue); }
+  footer { padding:10px 22px; color:var(--dim); font-size:12px;
+           border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰️ SRE 值守工作台 <span class="dim" style="font-weight:normal">· 天窗总成只读诊断 · 端口 8021 · 只读零写副作用</span></h1>
+  <div class="honesty" id="honesty-banner">诚实边界加载中…</div>
+</header>
+<nav id="tabs">
+  <button data-tab="precheck" class="active">① 班前健康检查</button>
+  <button data-tab="evaluator">② 评测器 v2 复核台</button>
+  <button data-tab="defect">③ fall-through 病灶对照</button>
+  <button data-tab="slo">④ SLO 基线采集台</button>
+  <button data-tab="runbook">⑤ 30 天定标流程</button>
+</nav>
+<main>
+  <section id="panel-precheck">
+    <h2>班前健康检查 <span class="dim">—— 模拟场景: 值守工程师接班, 先确认系统是否健康 (手册场景 1)</span></h2>
+    <button class="act" onclick="runPrecheck()">运行班前检查</button>
+    <div id="precheck-out" style="margin-top:12px"></div>
+  </section>
+
+  <section id="panel-evaluator" class="hidden">
+    <h2>评测器 v2 复核台 <span class="dim">—— 模拟场景: 质量工程师逐例复核评测器判定 (手册场景 2); 点行看事实级判定矩阵</span></h2>
+    <div id="eval-summary"></div>
+    <table id="eval-table"><thead><tr>
+      <th>case_id</th><th>split</th><th>候选终态</th><th>标签期望</th>
+      <th>v1 落盘 match</th><th>v2 真判定</th><th>事实层命中</th>
+    </tr></thead><tbody></tbody></table>
+    <div id="eval-detail" style="margin-top:14px"></div>
+  </section>
+
+  <section id="panel-defect" class="hidden">
+    <h2>fall-through 病灶对照 <span class="dim">—— 模拟场景: 评测器缺陷评审会, 新成员理解为何 v1 会虚 hit (手册场景 3)</span></h2>
+    <button class="act" onclick="loadDefect()">加载对照演示</button>
+    <div id="defect-out" style="margin-top:12px"></div>
+  </section>
+
+  <section id="panel-slo" class="hidden">
+    <h2>SLO 基线采集台 <span class="dim">—— 模拟场景: SRE 周会要基线报告, 数据不足时亲眼看到系统拒绝编造 (手册场景 4)</span></h2>
+    <div class="row-input">
+      <label>窗口起 <input id="slo-start" value="2026-11-01"></label>
+      <label>窗口止 <input id="slo-end" value="2026-11-08"></label>
+      <label>最小分母 <input id="slo-min" value="30" style="width:70px"></label>
+      <button class="act" onclick="collectSlo()">采集基线 (只读)</button>
+    </div>
+    <div id="slo-out"></div>
+  </section>
+
+  <section id="panel-runbook" class="hidden">
+    <h2>30 天定标流程看板 <span class="dim">—— 模拟场景: 定标评审前的流程对齐 (手册场景 5); 流程合同原文 deploy/slo-adoption-runbook-v1.md</span></h2>
+    <div id="runbook-out"></div>
+  </section>
+</main>
+<footer id="foot"></footer>
+<script>
+
+const $ = (id) => document.getElementById(id);
+const tag = (cls, text) => `<span class="tag ${cls}">${text}</span>`;
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+document.getElementById("tabs").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.remove("active"));
+  e.target.classList.add("active");
+  document.querySelectorAll("main section").forEach((s) => s.classList.add("hidden"));
+  document.getElementById("panel-" + e.target.dataset.tab).classList.remove("hidden");
+});
+
+async function runPrecheck() {
+  $("precheck-out").innerHTML = "检查中…";
+  const r = await api("/api/v1/duty/precheck");
+  const rows = r.checks.map((c) =>
+    `<tr><td>${esc(c.name)}</td><td>${c.ok ? tag("ok", "PASS") : tag("bad", "RED")}</td>
+     <td class="dim">${esc(c.detail)}</td></tr>`).join("");
+  $("precheck-out").innerHTML =
+    `<p>${r.overall === "GREEN" ? tag("ok", "整体 GREEN — 可以接班值守") : tag("bad", "整体 RED — 按手册场景 1 处置")}</p>
+     <table><thead><tr><th>检查项</th><th>结果</th><th>详情</th></tr></thead><tbody>${rows}</tbody></table>
+     <p class="dim">${esc(r.note)}</p>`;
+}
+
+async function loadCases() {
+  const r = await api("/api/v1/evaluator/cases");
+  const s = r.summary;
+  $("eval-summary").innerHTML =
+    `<p class="kv">状态门 v2 真判定 <b>${esc(s.state_gate_v2)}</b>
+     (v1 落盘 60/60 为自比较恒真, 缺陷已登记) · 事实层 <b>${s.fact_layer.required_facts_hit}/${s.fact_layer.required_facts_total}</b>
+     · forbidden 违规 <b>${s.fact_layer.forbidden_checks_violations}</b> ·
+     ${s.state_miss_cases_v2.map((m) => tag("bad", m.case_id)).join(" ")}</p>`;
+  const tbody = r.cases.map((c) => {
+    const v1 = c.state_match_v1_recorded ? tag("warn", "true (恒真)") : tag("info", "false");
+    const v2 = c.state_match_v2 ? tag("ok", "match") : tag("bad", "miss");
+    return `<tr class="case-row" data-case="${esc(c.case_id)}">
+      <td>${esc(c.case_id)}</td><td>${esc(c.split)}</td><td>${esc(c.state)}</td>
+      <td>${esc(c.expected_task_state)}</td><td>${v1}</td><td>${v2}</td>
+      <td>${esc(c.required_hit_ratio)}</td></tr>`;
+  }).join("");
+  document.querySelector("#eval-table tbody").innerHTML = tbody;
+  document.querySelectorAll("tr.case-row").forEach((tr) =>
+    tr.addEventListener("click", () => showCase(tr.dataset.case)));
+
+async function showCase(caseId) {
+  const r = await api("/api/v1/evaluator/case/" + encodeURIComponent(caseId));
+  if (r.error) { $("eval-detail").innerHTML = tag("bad", esc(r.error)); return; }
+  const c = r.case;
+  const factRows = (c.required_fact_checks || []).map((f) => {
+    const st = f.hit ? tag("ok", "hit") : tag("bad", "miss");
+    const trig = Object.entries(f.all_triggers || {})
+      .map(([k, v]) => `${k}=${v === null ? "None(空真不判定)" : v}`).join(", ");
+    return `<tr><td>${esc(f.fact)}</td><td>${esc(f.rule_id ?? "")}</td><td>${st}</td>
+      <td class="dim">${esc(f.basis ?? "")}<br>触发矩阵: ${esc(trig)}</td></tr>`;
+  }).join("");
+  const forbRows = (c.forbidden_fact_checks || []).map((f) =>
+    `<tr><td>${esc(f.fact)}</td><td>${esc(f.mode)}</td>
+     <td>${f.ok ? tag("ok", "ok") : tag("bad", "violation")}</td></tr>`).join("");
+  $("eval-detail").innerHTML =
+    `<h3>${esc(c.case_id)} <span class="dim">state=${esc(c.state)} 期望=${esc(c.expected_task_state)}
+     reason=${esc(c.reason_code ?? "-")} · v2 映射=${esc(c.state_mapped_v2)} ·
+     v2=${c.state_match_v2 ? tag("ok","match") : tag("bad","miss")} ·
+     v1 落盘=${c.state_match_v1_recorded ? tag("warn","true(恒真)") : tag("info","false")}</span></h3>
+     <table><thead><tr><th>required_fact</th><th>终局规则</th><th>判定</th><th>依据 + 触发矩阵留痕</th></tr></thead><tbody>${factRows}</tbody></table>
+     <table style="margin-top:8px"><thead><tr><th>forbidden_fact</th><th>模式</th><th>判定</th></tr></thead><tbody>${forbRows}</tbody></table>`;
+}
+
+async function loadDefect() {
+  $("defect-out").innerHTML = "加载中…";
+  const r = await api("/api/v1/defect/fallthrough-demo");
+  const v1 = r.v1_semantic_simulated;
+  $("defect-out").innerHTML =
+    `<p class="kv">演示事实: <b>${esc(r.fact)}</b> · 记录形态: state=${esc(r.record_shape.state)}, answer=${esc(r.record_shape.answer_text)}</p>
+     <div class="grid">
+       <div class="mini"><h3>${tag("bad", "v1 语义 (教学等价构造)")}</h3>
+         <ul>${v1.scan_trace.map((t) => `<li>${esc(t.rule)} — 触发=${esc(String(t.triggered))}, 通过=${esc(String(t.passed))}, ${esc(t.continues ?? "")} ${esc(t.verdict ?? "")}</li>`).join("")}</ul>
+         <p class="dim">终局: ${esc(v1.final)}</p></div>
+       <div class="mini"><h3>${tag("ok", "v2 语义 (真实执行)")}</h3>
+         <p class="kv">终局规则 <b>${esc(r.v2_semantic_real.rule_id)}</b> ·
+         判定 <b>${r.v2_semantic_real.hit ? "hit" : "miss"}</b></p>
+         <p class="dim">${esc(r.v2_semantic_real.basis)}</p>
+         <p class="kv">触发矩阵: ${esc(Object.entries(r.v2_semantic_real.all_triggers).map(([k, v]) => `${k}=${v}`).join(", "))}</p></div>
+     </div>
+     <p>${tag("info", esc(r.verdict))}</p>
+     <p class="dim">${esc(v1.disclaimer)}</p>`;
+}
+
+async function collectSlo() {
+  $("slo-out").innerHTML = "采集中…";
+  const q = new URLSearchParams({ start: $("slo-start").value, end: $("slo-end").value,
+                                  min_denominator: $("slo-min").value });
+  const r = await api("/api/v1/slo/collect?" + q);
+  const p = r.report;
+  const verdictBadge = p.verdict === "insufficient_data"
+    ? tag("warn", "insufficient_data — 数据不足, [U] 保持待定")
+    : tag("info", "baseline_only_no_target_merge — 口径可算, 但绝不等于达标");
+  $("slo-out").innerHTML =
+    `<p>${verdictBadge} <span class="dim">分母 ${p.denominator.total_tasks} 条任务</span></p>
+     <div class="grid">
+       <div class="mini"><h3>SLO-1 allowed_terminal_rate</h3>
+         <p class="kv">值 <b>${p.slo_1_allowed_terminal_rate.value === null ? "None (守卫)" : p.slo_1_allowed_terminal_rate.value}</b> · 目标 ${esc(p.slo_1_allowed_terminal_rate.target)}</p>
+         <p class="dim">${esc(p.slo_1_allowed_terminal_rate.definition)}</p></div>
+       <div class="mini"><h3>SLO-2 forbidden_effect_count</h3>
+         <p class="kv">值 <b>${p.slo_2_forbidden_effect_count.value}</b> · ${esc(p.slo_2_forbidden_effect_count.target)}</p>
+         <p class="dim">${esc(p.slo_2_forbidden_effect_count.definition)}</p></div>
+       <div class="mini"><h3>SLO-3 未确认效果时延</h3>
+         <p class="kv">值 <b>None</b> · ${esc(p.slo_3_unconfirmed_resolution.target)}</p>
+         <p class="dim">${esc(p.slo_3_unconfirmed_resolution.applicability)}</p></div>
+     </div>
+     <p class="dim">分母口径: ${esc(p.denominator.note)}</p>
+     <p class="dim">诚实性: ${esc(p.honesty.note)}</p>
+     <p class="dim">值守注: ${esc(r.duty_note)}</p>`;
+}
+
+async function loadRunbook() {
+  const r = await api("/api/v1/slo/runbook-steps");
+  $("runbook-out").innerHTML =
+    `<p>${r.red_lines.map((x) => tag("warn", esc(x))).join(" ")}</p>
+     <div class="grid">${r.phases.map((p) =>
+       `<div class="mini"><h3>${esc(p.phase)} · ${esc(p.name)}</h3><ul>${p.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")}
+     </div><p class="dim">${esc(r.honesty)}</p>`;
+}
+
+(async function init() {
+  const h = await api("/api/v1/honesty");
+  $("honesty-banner").textContent = h.statement;
+  $("foot").textContent = "只读工作台 (零写端点) · 手册: " + h.guide +
+    " · 全部数据为教学模拟 (synthetic), 零真实生产流量宣称 · 阶段 E 批次 3";
+  await loadCases();
+  await loadRunbook();
+})();
+</script>
+</body>
+</html>
+
+}

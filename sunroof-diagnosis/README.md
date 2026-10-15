@@ -141,6 +141,12 @@ python -m deploy.slo_baseline_aggregator --db data/sunroof.db --window-start 202
 python ci/run_local_ci.py --evidence-file evidence/ci-run-e2.log
                                          # CI 四阶段: STAGE-2 200 用例, STAGE-3 54 文件, STAGE-4 4/4
 
+# —— 阶段 E 批次 3 SRE 值守工作台 (只读交互面: 班前检查/评测复核/病灶对照/SLO 采集/定标看板) ——
+python -m workbench_sre.app
+                                         # 端口 8021; 使用手册 (5 个生产现场场景逐步剧本): deploy/sre-workbench-guide-v1.md
+python ci/run_local_ci.py --evidence-file evidence/ci-run-e3.log
+                                         # CI 四阶段: STAGE-2 208 用例, STAGE-3 55 文件, STAGE-4 4/4
+
 # 备份/恢复 (Ubuntu Docker 部署口径见 deploy/runbook-v2.md §3/§4):
 python deploy/backup_snapshot.py --db data/sunroof.db --out-dir data/backups --label nightly
 python deploy/restore_snapshot.py --backup-file data/backups/<备份文件>.db --db data/sunroof.db

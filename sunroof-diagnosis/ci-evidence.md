@@ -594,4 +594,36 @@ CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evid
   SLO-3 不适用登记 / 只读聚合（DB 字节前后一致）；扫描范围 +1（54 文件）。
 - 证据日志: `evidence/ci-run-e2.log`。
 
+## 阶段 E 批次 3 —— SRE 值守工作台（可交互 web 交付物，端口 8021）+ 使用手册
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-e3.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-005 + 完整性 + 哈希链自洽（audit_chain_ok=True） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/SLO 基线聚合器/**值守工作台**） | PASS（**208 tests，OK = 200 + 工作台 8**） |
+| STAGE-3-redaction | 静态扫描（**55 文件**；范围 +`workbench_sre/app.py`） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+批次 3 交付点（用户拍板的「可验收可交互 web 交付物 + 详细业务场景使用手册 +
+一步步模拟真实生产现场场景」）：
+
+- **五面板值守模拟**（`workbench_sre/`，标准库 `http.server` 实现、对齐 8018 惯例、
+  **只读零写端点**——POST 一律 405，静态服务含目录穿越防护）：
+  ① 班前健康检查（DB 完整性/审计哈希链/评测器 v2 可复算/聚合器守卫/冻结产物在位，
+  GREEN-RED 如实呈现）；② 评测器 v2 复核台（60 例逐例 v1 恒真 vs v2 真判定 + 事实级
+  判定矩阵展开，HOLD-06 真实奖励/HOLD-12 如实 miss）；③ fall-through 病灶对照
+  （v1 教学等价构造的「触发未过继续扫描+空真虚 hit」vs v2 专属触发终局 miss 并排）；
+  ④ SLO 基线采集台（[U] 守卫亲眼看：教学库 insufficient_data + 比率 None，绝不编造）；
+  ⑤ 30 天定标流程看板（runbook 四红线五阶段结构化）。
+- **使用手册 `deploy/sre-workbench-guide-v1.md`**：五个生产现场场景逐步剧本——
+  交接班（班前检查判读 + 红项处置表）/ 质量复核（对质检仪器做计量复核）/ 缺陷评审会
+  （三条修正语义讲透）/ SRE 周会（系统拒绝编造数字的正确结论写法）/ 定标评审准备
+  （[U]→数值唯一合法路径）；附 API 速查、故障处置、诚实边界。
+- 新增 8 测试（`tests/test_workbench_sre.py`）：precheck GREEN / 60 例+58/60 /
+  HOLD-06 真实奖励 / HOLD-12 如实 miss / 病灶对照语义 / [U] 守卫 / runbook 结构 /
+  只读纪律（POST 405+404+目录穿越防护+index 服务）；扫描范围 +1（55 文件）。
+- 证据日志: `evidence/ci-run-e3.log`。
+
+
 
