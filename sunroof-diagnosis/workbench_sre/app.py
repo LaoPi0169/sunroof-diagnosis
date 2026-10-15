@@ -63,12 +63,19 @@ _DEMO_FACT = "明确说明无现行来源支撑该定损流程"
 
 
 
+def _ensure_task_db() -> None:
+    """任务库幂等自愈: 无条件 init_db (全部迁移 CREATE IF NOT EXISTS / OR IGNORE,
+    重复执行不改变已有终态)。先例 = generation/run_rag_evaluation.py L59 冷启动
+    自愈 (只建库, 绝不触碰冻结清单) —— 工作台对「tracked 旧库缺新表」的环境
+    (干净 clone / 冷部署) 自动补齐, 绝不要求值守先手工跑迁移。"""
+    init_db(TASK_DB)
+
+
 def _duty_precheck() -> dict:
-    """面板① 班前健康检查 (全部只读)。"""
+    """面板① 班前健康检查 (全部只读; 库结构幂等自愈后检查)。"""
     checks = []
     try:
-        if not os.path.exists(TASK_DB):
-            init_db(TASK_DB)
+        _ensure_task_db()
         conn = sqlite3.connect(TASK_DB)
         try:
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
@@ -163,7 +170,8 @@ def _fallthrough_demo() -> dict:
 
 
 def _slo_collect(start: str, end: str, min_denominator: int = 30) -> dict:
-    """面板④ SLO 基线采集 (聚合器只读; [U] 守卫原样透传)。"""
+    """面板④ SLO 基线采集 (聚合器只读; [U] 守卫原样透传; 库结构幂等自愈)。"""
+    _ensure_task_db()
     report = aggregate(TASK_DB, start, end, min_denominator)
     return {"panel": "slo_collect", "report": report,
             "duty_note": ("SRE 周会场景: insufficient_data = 数据不足 [U] 保持待定, "
@@ -282,6 +290,7 @@ class WorkbenchSREHandler(BaseHTTPRequestHandler):
 def main() -> None:
     bind = os.environ.get("SUNROOF_SRE_BIND", "127.0.0.1")
     port = int(os.environ.get("SUNROOF_SRE_PORT", "8021"))
+    _ensure_task_db()  # 启动即幂等自愈 (冷启动先例, 见 _ensure_task_db docstring)
     try:
         server = ThreadingHTTPServer((bind, port), WorkbenchSREHandler)
     except OSError as exc:
