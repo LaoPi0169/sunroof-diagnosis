@@ -558,3 +558,40 @@ CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evid
   扫描范围 +1（53 文件）。
 - 证据日志: `evidence/ci-run-e1.log`。
 
+## 阶段 E 批次 2 —— SLO 基线聚合器（[U] 守卫 + 口径机械化）+ 定标 Runbook
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-e2.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-005 + 完整性 + 哈希链自洽（audit_chain_ok=True） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/评测器 v2/**SLO 基线聚合器**） | PASS（**200 tests，OK = 194 + SLO 6**） |
+| STAGE-3-redaction | 静态扫描（**54 文件**；范围 +`deploy/slo_baseline_aggregator.py`） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+批次 2 交付点：
+
+- **聚合器 `deploy/slo_baseline_aggregator.py`**：把 `week-16/slo-proposal-v0.md`
+  三口径机械化（对齐 `runtime-sli-spec-v1.md` §三 的教学库映射）——
+  SLO-1 allowed_terminal_rate（分母 = 窗口内任务总数**含** initialized 与 denied，
+  诚实分母绝不「只数完成的」；denied 单独计数不折进分子；initialized 非终态不折叠）；
+  SLO-2 恒等硬门 0 的表层交叉对账（task_action_runs 被阻断动作 vs 任务终态矛盾，
+  测试证明矛盾注入被抓住 = 1、正常库恒 0）；SLO-3 **不适用登记**
+  （not_applicable_to_task_tables——未确认终态口径需 trace 层，本聚合器不发明代用口径）。
+- **[U] 守卫（硬编码）**：分母 < 30 → `verdict=insufficient_data` 且比率置 None
+  （小样本比率绝不输出——拿 1/1=100% 当基线是被禁止的行为）；分母足够 →
+  `baseline_only_no_target_merge`（口径可算但目标仍 [U]）；全部输出硬编码
+  `denominator_note`（考卷 60 例分母与任务分母永不共享/永不合并）+ honesty 声明
+  （教学/合成流量 ≠ 真实生产流量、`targets_all_u=true`、禁止合成回放代填）。
+- **定标 Runbook `deploy/slo-adoption-runbook-v1.md`**：30 天定标流程合同——
+  红线 4 条（无真实流量不定案/两数永不合并/恒等硬门不可协商/小样本不下结论）、
+  第 0 天值守班前清单、第 1–7 天基线采集判读规则、第 8–14 天定案评审四项输入
+  （分母口径声明/非达标标注/无目标值/两数不合并）、第 15–28 天真实流量放量观察、
+  第 29–30 天定案评审（[U]→数值的唯一合法路径：双签 + 新版本记录文件
+  `slo-adoption-record`，绝不回写 slo-proposal-v0）、未达标/异常动作表、记录模板。
+- 新增 6 测试（`tests/test_slo_baselining.py`）：insufficient_data 守卫 /
+  baseline_only 口径可算目标仍 [U] / 恒等硬门矛盾抓取 / 诚实性字段完备 /
+  SLO-3 不适用登记 / 只读聚合（DB 字节前后一致）；扫描范围 +1（54 文件）。
+- 证据日志: `evidence/ci-run-e2.log`。
+
+

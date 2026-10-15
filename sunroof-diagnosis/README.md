@@ -135,6 +135,12 @@ python -m evaluation.evaluator_v2 --write
 python ci/run_local_ci.py --evidence-file evidence/ci-run-e1.log
                                          # CI 四阶段: STAGE-2 194 用例, STAGE-3 53 文件, STAGE-4 4/4
 
+# —— 阶段 E 批次 2 SLO 基线聚合器 ([U] 守卫: 无真实流量不定案) ——
+python -m deploy.slo_baseline_aggregator --db data/sunroof.db --window-start 2026-11-01T00:00:00Z --window-end 2026-11-08T00:00:00Z
+                                         # 窗口任务终态 -> SLO-1/2/3 基线观测; 分母<30 = insufficient_data; 定标流程见 deploy/slo-adoption-runbook-v1.md
+python ci/run_local_ci.py --evidence-file evidence/ci-run-e2.log
+                                         # CI 四阶段: STAGE-2 200 用例, STAGE-3 54 文件, STAGE-4 4/4
+
 # 备份/恢复 (Ubuntu Docker 部署口径见 deploy/runbook-v2.md §3/§4):
 python deploy/backup_snapshot.py --db data/sunroof.db --out-dir data/backups --label nightly
 python deploy/restore_snapshot.py --backup-file data/backups/<备份文件>.db --db data/sunroof.db
