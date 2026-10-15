@@ -129,6 +129,12 @@ python ci/run_local_ci.py --evidence-file evidence/ci-run-d2.log
 python ci/run_local_ci.py --evidence-file evidence/ci-run-d3.log
                                          # CI 四阶段: STAGE-1 audit_chain_ok=True, STAGE-2 183 用例, STAGE-3 52 文件, STAGE-4 4/4
 
+# —— 阶段 E 批次 1 评测器 v2 (判定层补全 + fall-through 修正语义) ——
+python -m evaluation.evaluator_v2 --write
+                                         # 60 例事实级判定: 状态门真判定 58/60 + 事实层 67/81 + forbidden 0 违规; 产物已存在则只读对账
+python ci/run_local_ci.py --evidence-file evidence/ci-run-e1.log
+                                         # CI 四阶段: STAGE-2 194 用例, STAGE-3 53 文件, STAGE-4 4/4
+
 # 备份/恢复 (Ubuntu Docker 部署口径见 deploy/runbook-v2.md §3/§4):
 python deploy/backup_snapshot.py --db data/sunroof.db --out-dir data/backups --label nightly
 python deploy/restore_snapshot.py --backup-file data/backups/<备份文件>.db --db data/sunroof.db
@@ -153,6 +159,7 @@ python deploy/restore_snapshot.py --backup-file data/backups/<备份文件>.db -
 9. 生产加固三门（阶段 D 批次 1，测试已证明）：并发乐观锁——过期版本动作显式 `CONCURRENCY_CONFLICT`（任务终态不变 + 审计留痕，绝不盲重试，幂等重放与冻结基线逐字节等价）；审计防篡改——业务字段篡改/删行/链头破坏均被 `verify_audit_chain()` 定位到 run_id（同事务入链，历史行一次性补链只补哈希注记、业务字段零改动）；签名令牌 Default-Deny——过期/吊销/改签/畸形一律 401，签发面未知用户与坏凭证同封套零存在性泄漏，吊销为主管专属且幂等。
 10. 三源适配器缝三门（阶段 D 批次 2，测试已证明）：默认合成——注册表默认逐方法委托冻结夹具，全消费面遍历后三源 store 指纹逐字节一致；换装 Default-Deny——不满足取数协议的适配器拒绝注入，HTTP 模式缺任一端点快速失败且注册表零变化（绝不静默回退/部分换装）；不可达不编造——源不可达沿用既有结构化拒答（用户面三因一致 `not_available` + 受限审计 `source_unavailable:<源>` 精细分型），绝不拼装部分合成数据冒充三源报告。
 11. 生产发布包三门（阶段 D 批次 3，测试已证明）：非 root 镜像——Dockerfile 专用用户 uid/gid 10001 且构建期全量测试门以非 root 身份执行（权限配错 = 构建失败，静态断言 USER 非 root + 测试门位于 USER 之后）；清单 v2 六类绑定——代码基线/配置 sha256/冻结合同 5 份 sha256 全部与文件实算逐字节一致、schema 005、清单零秘密字面量；备份/恢复哈希链门——快照后 `integrity_check` + `verify_audit_chain()` 三重校验不过即回滚删除（绝不产出坏备份），被篡改备份恢复 fail-fast 拒绝且目标库逐字节零触碰，正常恢复后逐字节一致且链校验 ok。
+12. 评测器 v2 三门（阶段 E 批次 1，测试已证明）：专属触发即终局——required_fact 触发判否即 miss，绝不向后扫描兜底（上级 NS-HOLD-06 型病灶等价构造被正确拒绝）；空真修正——无版本锚点不产生判定、数字锚点剥离版本号（v3 的 3 不是数量锚点）；判定矩阵留痕——每条 fact 记录全部触发规则及判定，v1 落盘 60/60 为自比较恒真（判定层缺陷登记在案），v2 真判定 58/60 逐例呈现差异且 v1 产物零改动（内容 hash 前后一致），事实层 miss 如实呈现绝不因拒答得体虚判。
 
 ## 诚实边界
 MES/QMS/PLM 为 SQLite 合成夹具模拟；零大模型；SN 自动抓取（节点 ⑰）、PLM 工程记录查询（节点 ⑱）、QMS 检验标准查询（节点 ⑲）与根因分析报告草稿（节点 ⑳）已以只读 MCP 工具交付（MES/QMS/PLM 均为确定性合成夹具，零真实系统连接，凭证治理沿用教学模拟静态 Token；报告草稿为确定性规则聚合 + 可复算偏差计算，零 LLM，`draft_ready` 是「依据充分可出具草稿」而非「合格判定」）；`abstained` 终态后续扩展不改既有语义；Token 为教学模拟鉴权——阶段 D 批次 1 起提供生产形状的 `sr1.*` HMAC 签名短时令牌（过期/吊销/严格模式退役静态令牌），仍非真实 SSO/OIDC，上线前需按真实身份源重审权限矩阵（`specs/production-hardening-brief-v1.md` §2 非目标维持）。阶段 D 批次 2 起三源取数经适配器缝（`mcptool/source_adapter.py`）：HTTP 适配器为「缝」而非「集成」——真实 MES/QMS/PLM 接入需按其真实 API 契约另做载荷映射与行级过滤，本骨架仅交付传输语义（端点/超时/有限重试）与不可达结构化拒答，默认关闭且绝不以合成数据冒充真实源。阶段 D 批次 3 起交付生产发布包：非 root 容器（uid/gid 10001）只覆盖容器内进程；备份工具校验的是审计链一致性与库完整性而非业务正确性（放量门永远是任务级冒烟 4/4）；快照/恢复不替代异地容灾与保留策略；compose 为单容器编排（无多实例/热回滚）。批次 `completed` 不等于数据质量完美、不等于用户已采用、不等于产生商业 ROI；`completed_with_quarantine` 是正常运营状态；摄取为服务层能力，未新增 HTTP 面（与原仓库 Week 06 惯例一致）。任务状态机为单库单事务设计（幂等键是第一道防线）；阶段 D 批次 1 起追加乐观锁 `expected_version`（过期版本显式 `CONCURRENCY_CONFLICT`，`decision-memo-02.md` 生产化差距清单第 1 条已兑现）；`confirmed`/`refused` 为终态、无重开转移；质量主管结案仅代表本系统内复核闭环，原系统人工流程双轨并行；CLI 工作台为薄壳，安全全部在服务端。部署面（节点 ⑤）：回滚对象是**配置数据**而非代码，DDL 迁移只增不做降级（`ROLLBACK.md` 场景 B）；单机沙盒演练不宣称生产就绪、热回滚或多实例编排；`/health` 200 只代表进程存活，放量只认任务级冒烟 4/4；任务夹具为一次性状态机终态，冒烟复验必须用全新初始化的数据版本；收敛器不判对错（对错靠评审 + 冒烟双防线，引擎对非法配置值防御性回退默认）。语料面（节点 ⑥）：五态路由与候选检查只证明「语料可被治理、权限可下推」，不证明检索质量与相关性；语料 ACL 是角色级（pqe/quality_supervisor），未下推到 OEM 项目组维度；8 份来源全为教学合成（synthetic=true），冲突对在所有者裁决前不作为任何答案依据；「语料可构建」不外推「RAG 改善任务」（后者归第 10–12 周冻结评测）。评测面（节点 ⑦）：本周只证明「评测合同与 60 条案例已在看候选结果之前冻结，且确定性基线已逐例跑通」，不宣称检索质量与答案质量；基线分布为本仓库第 2 周引擎真实 ACL 语义的实测（主管跨项目可见同零件双现行版本 → SPEC_CONFLICT），未回调引擎、未删难题；60 例均含显式角色（无 unknown_role 案例）；材料全为教学合成；保留集为自我封存 ≠ 独立盲测；课程数量与阈值不构成行业标准、客户承诺或生产门槛。

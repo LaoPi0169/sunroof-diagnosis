@@ -83,6 +83,7 @@ SCOPE_FILES = [
     os.path.join("workbench_handoff", "app.py"),
     os.path.join("deploy", "backup_snapshot.py"),    # 阶段 D 批次 3: 备份快照工具
     os.path.join("deploy", "restore_snapshot.py"),   # 阶段 D 批次 3: 恢复工具
+    os.path.join("evaluation", "evaluator_v2.py"),   # 阶段 E 批次 1: 评测器 v2 (判定层补全)
 ]
 
 # 运行时输出中绝对禁止的内容 —— 凭据类 (全范围)

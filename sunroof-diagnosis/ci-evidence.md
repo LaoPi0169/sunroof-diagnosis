@@ -508,3 +508,53 @@ CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evid
 - 用户既存决策项维持不动（`.gitignore` 损坏编辑 / 再生基线文件 / relic 内层
   `.git` / 未跟踪 `evidence/ci-run-w16-fix.log`）；提交显式逐文件 add。
 - 证据日志: `evidence/ci-run-d3.log`。
+
+## 阶段 E 批次 1 —— 评测器 v2（判定层补全 + fall-through 修正语义；方案甲）
+
+CI RUN 2026-10-14 | host=local | python=3.13 | 入口 `ci/run_local_ci.py --evidence-file evidence/ci-run-e1.log`
+
+| 阶段 | 内容 | 结果 |
+| --- | --- | --- |
+| STAGE-1-schema | 幂等迁移 001-005 + 完整性 + 哈希链自洽（audit_chain_ok=True） | PASS |
+| STAGE-2-unittest | 全量集成测试（…/发布打包/**评测器 v2**） | PASS（**194 tests，OK = 183 + 评测器 v2 11**） |
+| STAGE-3-redaction | 静态扫描（**53 文件**；范围 +`evaluation/evaluator_v2.py`，emissions 67） | PASS（violations=0） |
+| STAGE-4-clean-env-smoke | `git archive HEAD` 冷部署 + 冒烟门 | PASS（**4/4**） |
+
+批次 1 交付点（用户拍板：方案甲 / 两批连做 / 完工后 web 工作台+手册——手册随 E3 交付）：
+
+- **v1 判定层缺陷登记（本轮新发现，如实呈报）**：`generation/run_rag_evaluation.py`
+  L75/L81 `rec["match"] = rec["expected_task_state"] == rec["expected_task_state"]`
+  为自比较恒真 → v1 落盘 `state_gate_match 60/60` 属判定层虚高（真实字面对齐 28/60，
+  其中 31 例为「同族安全行为」差异）。v1 产物文件零改动（测试以内容 hash 前后一致
+  证明）；v1 只读对账路径的 dev+cal 复算（expected vs 公开标签）语义正确，不受此
+  缺陷影响。
+- **状态门 v2 预注册映射**（移植上级 `evaluate.py STATE_MAPPING` 的词汇与先例）：
+  `escalate≡escalated` 词形归一；`abstained+conflict_gate≡needs_review`（候选冲突
+  路径已做「登记冲突+转质量主管」，`generation/contract.py` 冲突分支 user_next_step
+  实证，上级 conflicting_current_sources 同款「上报即复核」语义）；其余 abstained≡
+  refused（同为「不给出内容」安全归宿；labeling-guide 规则 2/4）；未登记组合 =
+  unmapped 绝不折叠成 match。真判定 **58/60**，miss = {SR-HOLD-07（安全侧停住未转
+  冲突复核，与上级 NS-HOLD-08 同型先例一致）, SR-HOLD-12（跨族漏答）}，与上级金丝雀
+  基线 58/60 交叉印证（两套考卷独立标注、同构结论）。
+- **事实层补全**（v1 无事实规则引擎，required/forbidden 落盘但从未逐条判定）：8 条
+  预注册规则（负向指令/无来源说明/冲突登记/升级路径/版本归属/数字锚点/工单留痕/
+  引用保真转介）对 81 条 required_facts 逐条判定 **67/81 hit**；14 条 miss 为如实的
+  覆盖缺口呈现（候选统一拒答话术未含现行依据指引 ×6、SR-HOLD-07 冲突误归因 ×2、
+  SR-DEV-11 合并工时口径未覆盖 ×1 等——v1 从未呈现的维度），绝不因「拒答得体」
+  虚判 hit（SR-HOLD-06 的两条 required facts 由 no_current_source 真实判定命中，
+  与上级 NS-HOLD-06 行为 miss 形成教学对照）。forbidden doc_guard/structural
+  两分法 **0 违规**。
+- **上级 fall-through 继承修正（归档注记）**：三条修正语义（①专属触发即终局——触发
+  判否即 miss，绝不向后扫描兜底；②空真修正——无版本锚点不产生判定，数字锚点剥离
+  版本号；③判定矩阵留痕——全部触发规则及判定逐条记录）在 `evaluation/evaluator_v2.py`
+  机械实现并以 NS-HOLD-06 型等价构造测试证明；上级 `generation/evaluate.py` 原件
+  冻结不动（登记既定：修复留 v2，落点 = 子仓库，方案甲）。
+- **确定性守卫**：`week-12/rag-per-case-factcheck-v2.jsonl`（61 行 = 摘要 + 60 逐例）
+  重算逐字节一致；`--write` 对已存在产物只读对账、不一致即拒绝（评测器为纯函数，
+  零候选重跑、零模型调用）。
+- 新增 11 测试（`tests/test_evaluator_v2.py`）：修正语义①②③ / unmapped 诚实 /
+  状态门 58/60 / v1 缺陷登记 + v1 零改动 / 事实层诚实（DEV-11 数字锚点 miss 如实、
+  HOLD-06 真实奖励非虚判）/ 确定性与写守卫 / 输出结构完备 / forbidden 两分法 ×2；
+  扫描范围 +1（53 文件）。
+- 证据日志: `evidence/ci-run-e1.log`。
+
